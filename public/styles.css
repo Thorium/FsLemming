@@ -46,24 +46,26 @@ code { color: #ffd86b; }
 canvas { image-rendering: pixelated; display: block; background: var(--sky); }
 
 #game {
-  width: 720px; height: 450px;            /* 3x of the 240x150 viewport */
+  width: 720px; max-width: 100%; height: auto;  /* 3x of 240x150; shrinks on small screens, keeps ratio */
   border: 3px solid var(--panel-edge); border-radius: 4px;
   box-shadow: 0 0 0 4px var(--panel), 0 10px 28px rgba(0, 0, 0, 0.55);
   cursor: crosshair;                       /* signals the canvas is clickable */
+  touch-action: none;                      /* let the F# handlers own touch/drag */
 }
 
 #map {
-  width: 192px; height: 96px;             /* 1x of 192x96 (half the old 2x) */
+  width: 192px; max-width: 100%; height: auto;  /* 1x of 192x96 */
   margin-top: 0.6rem;
   border: 2px solid var(--panel-edge); border-radius: 3px;
   cursor: pointer;
 }
 
 #edit {
-  width: 960px; height: 300px;            /* 2x of 480x150 */
+  width: 960px; max-width: 100%; height: auto;  /* 2x of 480x150 */
   border: 3px solid var(--panel-edge); border-radius: 4px;
   box-shadow: 0 0 0 4px var(--panel);
   cursor: crosshair;
+  touch-action: none;
 }
 
 /* Panels for the HUD and control rows. */
@@ -109,6 +111,10 @@ a.btn:hover { color: #042310; filter: brightness(1.08); }
 
 button:hover { background: linear-gradient(#474d78, #313657); }
 button:active { transform: translateY(1px); border-bottom-width: 1px; }
+
+/* Out-of-stock skill: grayed-out text + icon so it reads as unavailable. */
+button.empty { color: var(--muted); opacity: 0.55; }
+button.empty .ic { filter: grayscale(1); opacity: 0.6; }
 
 /* The currently selected skill. */
 button.selected {
@@ -169,4 +175,31 @@ textarea {
   height: 8rem;
   margin-top: 0.5rem;
   font-family: monospace;
+}
+
+/* ---- Mobile / touch screens ------------------------------------------------
+   Bigger tap targets (>=44px tall) and roomier spacing so the controls are
+   usable with a thumb. The canvases already shrink to fit via max-width above. */
+@media (max-width: 640px) {
+  body { padding: 1rem 0.6rem 2.5rem; }
+  .wrap { max-width: 100%; }
+  h1 { font-size: 1.5rem; letter-spacing: 2px; }
+
+  .hud, .controls { padding: 0.7rem; }
+
+  /* Chunky, finger-sized buttons. */
+  button, a.btn {
+    font-size: 1rem;
+    min-height: 44px;
+    padding: 0.6rem 0.9rem;
+    margin: 0.25rem 0.35rem 0.25rem 0;
+  }
+
+  /* Larger skill icons to match the bigger buttons. Scale the rendered 16x16
+     box so the sprite-sheet offsets stay valid. */
+  .ic { transform: scale(1.4); transform-origin: left center; margin-right: 10px; }
+
+  /* Roomier form fields. */
+  select, input, textarea { font-size: 1rem; padding: 0.45rem 0.5rem; min-height: 44px; }
+  input[type="number"] { width: 4.5rem; }
 }

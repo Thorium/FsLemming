@@ -74,6 +74,9 @@ let private refreshCounts () =
             let n = counts |> Map.tryFind skill |> Option.defaultValue 0
             // Update the label span, not the button — that keeps the icon child.
             ((byId id).querySelector ".n").textContent <- sprintf "%s (%d)" label n
+            // Gray out buttons that are out of stock.
+            let cls = (byId id).classList
+            if n = 0 then cls.add "empty" else cls.remove "empty"
     }
 
 // ---- HUD --------------------------------------------------------------------
