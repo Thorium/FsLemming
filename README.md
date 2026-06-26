@@ -1,5 +1,7 @@
 # FsLemming
 
+[>> Play online](https://thorium.github.io/FsLemming/)
+
 A small F# tutorial on **message-passing architecture**: encapsulated state, no
 shared mutable data, no manual locks. The demo is a slice of *Lemmings* — many
 tiny independent characters plus one shared world — compiled to JavaScript with
