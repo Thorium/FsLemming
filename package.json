@@ -1,0 +1,15 @@
+{
+  "name": "fslemming",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "postinstall": "dotnet tool restore",
+    "start": "dotnet fable watch FsLemming.fsproj --run vite",
+    "dev": "dotnet fable watch FsLemming.fsproj --run vite",
+    "build": "dotnet fable FsLemming.fsproj --run vite build"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}

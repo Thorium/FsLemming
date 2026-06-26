@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FsLemming — actors all the way down</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>FsLemming</h1>
+      <p>An F# message-passing tutorial. Every lemming and the world is its own
+         message-passing agent (an F# <code>MailboxProcessor</code>).
+         Pick a skill, then click a lemming to assign it. Get enough to the green
+         exit before time runs out. Wide levels scroll — <strong>right-drag</strong>
+         the board, drag the minimap, use ← →, or hover the canvas edges.</p>
+      <canvas id="game" width="240" height="150"></canvas>
+      <div><canvas id="map" width="192" height="96"></canvas></div>
+      <div class="hud">
+        <span id="hud-level">—</span> &nbsp;|&nbsp;
+        <span id="hud-saved">Saved 0 / 0</span> &nbsp;|&nbsp;
+        <span id="hud-out">Out 0 / 0</span> &nbsp;|&nbsp;
+        <span id="hud-time">Time 0</span> &nbsp;
+        <span id="hud-status"></span>
+      </div>
+      <div class="controls">
+        <button id="skill-digger"><i class="ic ic-digger"></i><span class="n">Digger</span></button>
+        <button id="skill-basher"><i class="ic ic-basher"></i><span class="n">Basher</span></button>
+        <button id="skill-miner"><i class="ic ic-miner"></i><span class="n">Miner</span></button>
+        <button id="skill-builder"><i class="ic ic-builder"></i><span class="n">Builder</span></button>
+        <button id="skill-blocker"><i class="ic ic-blocker"></i><span class="n">Blocker</span></button>
+        <button id="skill-climber"><i class="ic ic-climber"></i><span class="n">Climber</span></button>
+        <button id="skill-floater"><i class="ic ic-floater"></i><span class="n">Floater</span></button>
+        <button id="skill-bomber"><i class="ic ic-bomber"></i><span class="n">Bomber</span></button>
+        <button id="nuke">💣 Nuke</button>
+        &nbsp;Lemmings:
+        <button id="count-1x">1×</button>
+        <button id="count-2x">2×</button>
+      </div>
+      <div class="controls">
+        Level: <select id="level-select"></select>
+        <button id="retry">↻ Retry</button>
+        <button id="next">→ Next</button>
+        &nbsp;<label>Load levels file: <input type="file" id="load-file" accept=".json,application/json" /></label>
+        &nbsp;&nbsp;Speed:
+        <button id="pause">⏸ Pause</button>
+        <button id="speed-slow">Slow</button>
+        <button id="speed-normal">Normal</button>
+        <button id="speed-fast">Fast</button>
+        <button id="speed-turbo">Turbo</button>
+      </div>
+      <p style="margin-top:1.5rem"><a class="btn" href="editor.html">✎ Open Level Editor</a></p>
+    </div>
+    <script type="module" src="/src/App.fs.js"></script>
+  </body>
+</html>

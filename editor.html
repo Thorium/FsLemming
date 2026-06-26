@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FsLemming — Level Editor</title>
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Level Editor</h1>
+      <p>
+        <a href="index.html">← back to the game</a>. <strong>Draw</strong> /
+        <strong>Erase</strong> terrain with the mouse (click or drag), or import an
+        image (dark pixels become solid ground). Use <em>Place hatch</em> /
+        <em>Place exit</em> then click the map to position them, set the parameters,
+        and export the same <code>levels.json</code> the game loads.
+      </p>
+      <div class="controls">
+        Brush:
+        <button id="tool-dirt">🟫 Dirt</button>
+        <button id="tool-steel">⬜ Steel</button>
+        <button id="tool-lava">🟥 Lava</button>
+        <button id="tool-water">🟦 Water</button>
+        <button id="tool-erase">🧽 Erase</button>
+        <button id="place-hatch">Place hatch</button>
+        <button id="place-exit">Place exit</button>
+      </div>
+      <div class="controls">
+        <label>Theme
+          <select id="f-theme">
+            <option value="earth">Earth</option>
+            <option value="stone">Stone</option>
+            <option value="brick">Brick</option>
+            <option value="hell">Hell</option>
+          </select>
+        </label>
+        &nbsp;or import an image: <input type="file" id="img" accept="image/*" />
+      </div>
+      <canvas id="edit" width="480" height="150"></canvas>
+      <div class="controls">
+        <label>Name <input id="f-name" value="My level" /></label>
+        <label title="how many lemmings the hatch releases">Lemmings <input type="number" id="f-spawn" value="10" /></label>
+        <label title="ticks between each lemming dropping from the hatch">Spawn gap <input type="number" id="f-every" value="14" /></label>
+        <label title="how many must reach the exit to win">Save <input type="number" id="f-save" value="5" /></label>
+        <label title="time limit in ticks">Time <input type="number" id="f-time" value="1500" /></label>
+      </div>
+      <div class="controls">
+        Inventory:
+        <label><i class="ic ic-digger"></i>Digger <input type="number" id="inv-digger" value="0" /></label>
+        <label><i class="ic ic-basher"></i>Basher <input type="number" id="inv-basher" value="0" /></label>
+        <label><i class="ic ic-miner"></i>Miner <input type="number" id="inv-miner" value="0" /></label>
+        <label><i class="ic ic-builder"></i>Builder <input type="number" id="inv-builder" value="0" /></label>
+        <label><i class="ic ic-blocker"></i>Blocker <input type="number" id="inv-blocker" value="0" /></label>
+        <label><i class="ic ic-climber"></i>Climber <input type="number" id="inv-climber" value="0" /></label>
+        <label><i class="ic ic-floater"></i>Floater <input type="number" id="inv-floater" value="0" /></label>
+        <label><i class="ic ic-bomber"></i>Bomber <input type="number" id="inv-bomber" value="0" /></label>
+      </div>
+      <div class="controls">
+        <button id="save">Save to browser</button>
+        <button id="export">Download levels.json</button>
+        <span id="save-status"></span>
+      </div>
+      <textarea id="out" placeholder="exported JSON appears here — save it as src/levels.json, or just 'Save to browser' to play it in the game"></textarea>
+    </div>
+    <script type="module" src="/src/Editor.fs.js"></script>
+  </body>
+</html>

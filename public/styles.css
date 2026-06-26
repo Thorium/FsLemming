@@ -1,0 +1,172 @@
+/* FsLemming — shared "Lemmings spirit" theme.
+   Purely cosmetic: every element the F# code touches keeps its id and type, so
+   this can't break the Fable constructs. Palette: green hair, blue body, earthy
+   panels, dark sky. */
+
+:root {
+  --sky: #14141f;
+  --panel: #21243a;
+  --panel-edge: #3a3f63;
+  --green: #19d152;
+  --green-dark: #0c6e2c;
+  --ink: #e8eaff;
+  --muted: #9aa0c8;
+  --danger: #ff5555;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 1.5rem 1rem 3rem;
+  font-family: "Lucida Console", "DejaVu Sans Mono", "Courier New", monospace;
+  line-height: 1.5;
+  color: var(--ink);
+  background: radial-gradient(circle at 50% -20%, #2c3160 0%, var(--sky) 55%) fixed;
+  min-height: 100vh;
+}
+
+.wrap { max-width: 1000px; margin: 0 auto; }
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.9rem;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--green);
+  text-shadow: 0 2px 0 #07351a, 0 0 14px rgba(25, 209, 82, 0.35);
+}
+
+p { color: var(--muted); max-width: 70ch; }
+a { color: var(--green); text-decoration: none; }
+a:hover { color: #7fe6ff; text-decoration: underline; }
+code { color: #ffd86b; }
+
+/* Canvases — keep the chunky pixels; frame them like a cabinet. */
+canvas { image-rendering: pixelated; display: block; background: var(--sky); }
+
+#game {
+  width: 720px; height: 450px;            /* 3x of the 240x150 viewport */
+  border: 3px solid var(--panel-edge); border-radius: 4px;
+  box-shadow: 0 0 0 4px var(--panel), 0 10px 28px rgba(0, 0, 0, 0.55);
+  cursor: crosshair;                       /* signals the canvas is clickable */
+}
+
+#map {
+  width: 384px; height: 192px;            /* 2x of 192x96 */
+  margin-top: 0.6rem;
+  border: 2px solid var(--panel-edge); border-radius: 3px;
+  cursor: pointer;
+}
+
+#edit {
+  width: 960px; height: 300px;            /* 2x of 480x150 */
+  border: 3px solid var(--panel-edge); border-radius: 4px;
+  box-shadow: 0 0 0 4px var(--panel);
+  cursor: crosshair;
+}
+
+/* Panels for the HUD and control rows. */
+.hud, .controls {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: 6px;
+  padding: 0.55rem 0.8rem;
+  margin: 0.6rem 0;
+}
+
+.hud { font-weight: bold; letter-spacing: 1px; }
+#hud-level { color: var(--green); }
+#hud-status { color: #ffcc33; }
+
+label { color: var(--muted); margin-right: 0.5rem; }
+
+/* Chunky raised buttons. */
+button {
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: linear-gradient(#3c4168, #2a2e4a);
+  border: 1px solid #4a4f7a;
+  border-bottom-width: 3px;
+  border-radius: 5px;
+  padding: 0.35rem 0.7rem;
+  margin: 0.2rem 0.3rem 0.2rem 0;
+  cursor: pointer;
+}
+/* A link styled as a button (e.g. the "Open Level Editor" link). */
+a.btn {
+  display: inline-block;
+  text-decoration: none;
+  color: #042310;
+  background: linear-gradient(var(--green), var(--green-dark));
+  border: 1px solid #0a5a24;
+  border-bottom-width: 3px;
+  border-radius: 5px;
+  padding: 0.4rem 0.8rem;
+}
+a.btn:hover { color: #042310; filter: brightness(1.08); }
+
+button:hover { background: linear-gradient(#474d78, #313657); }
+button:active { transform: translateY(1px); border-bottom-width: 1px; }
+
+/* The currently selected skill. */
+button.selected {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+  box-shadow: 0 0 10px rgba(25, 209, 82, 0.6);
+}
+
+/* Tiny sprite icon: a 16x16 window into lemmings.png (row 0 = first skin tone).
+   The element clips to 16x16, showing one frame. Used on skill buttons AND the
+   editor's inventory labels. */
+.ic {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+  margin-right: 4px;
+  image-rendering: pixelated;
+  background: url(lemmings.png) no-repeat 0 0;
+}
+button .n { vertical-align: middle; }
+
+.ic-digger { background-position: -96px 0; }   /* dig0  (col 6) */
+.ic-basher { background-position: -128px 0; }  /* bash0 (col 8) */
+.ic-miner { background-position: -160px 0; }   /* mine0 (col 10) */
+.ic-blocker { background-position: -192px 0; } /* block0 (col 12) */
+.ic-builder { background-position: -224px 0; } /* build0 (col 14) */
+.ic-climber { background-position: -256px 0; } /* climb0 (col 16) */
+.ic-floater { background-position: -288px 0; } /* float0 (col 18) */
+.ic-bomber { background-position: 0 0; }       /* walk0 (col 0) */
+
+/* Action buttons pop green; the nuke is danger-red. */
+#next, #export, #save {
+  background: linear-gradient(var(--green), var(--green-dark));
+  border-color: #0a5a24;
+  color: #042310;
+}
+#nuke {
+  background: linear-gradient(var(--danger), #b02020);
+  border-color: #7a1414;
+  color: #fff;
+}
+
+/* Inputs / selects / textarea. */
+select, input, textarea {
+  font-family: inherit;
+  color: var(--ink);
+  background: #15172a;
+  border: 1px solid var(--panel-edge);
+  border-radius: 4px;
+  padding: 0.25rem 0.4rem;
+}
+input[type="number"] { width: 4rem; }
+input[type="file"] { padding: 0.15rem; }
+
+textarea {
+  width: 960px; max-width: 100%;
+  height: 8rem;
+  margin-top: 0.5rem;
+  font-family: monospace;
+}

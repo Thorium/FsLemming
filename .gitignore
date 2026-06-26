@@ -1,0 +1,18 @@
+# Fable / .NET
+bin/
+obj/
+fable_modules/
+*.fs.js
+*.fs.js.map
+
+# Node / Vite
+node_modules/
+dist/
+
+# Editor
+.vs/
+.idea/
+.vscode/
+
+# Reference images (copyrighted) and scratch
+tmp/
