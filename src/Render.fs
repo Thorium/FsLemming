@@ -213,5 +213,15 @@ let drawMinimap
         if v.Alive then
             ctx.fillRect (float (v.X * mw / tw), float (v.Y * mh / th), 1.0, 1.0)
 
+    // Start (hatch) and end (exit), each a small colour blob centred on its region.
+    let marker (r: Region) color =
+        ctx?fillStyle <- color
+        let cx = (r.X + r.W / 2) * mw / tw
+        let cy = (r.Y + r.H / 2) * mh / th
+        ctx.fillRect (float cx, float cy, 2.0, 2.0)
+
+    marker level.Hatch "#33ff66" // start
+    marker level.Exit "#ff3344" // end
+
     ctx?strokeStyle <- "#ffffff"
     ctx.strokeRect (float (camX * mw / tw), 0.5, float (viewW * mw / tw), float mh - 1.0)

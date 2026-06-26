@@ -53,7 +53,7 @@ canvas { image-rendering: pixelated; display: block; background: var(--sky); }
 }
 
 #map {
-  width: 384px; height: 192px;            /* 2x of 192x96 */
+  width: 192px; height: 96px;             /* 1x of 192x96 (half the old 2x) */
   margin-top: 0.6rem;
   border: 2px solid var(--panel-edge); border-radius: 3px;
   cursor: pointer;
