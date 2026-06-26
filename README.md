@@ -134,11 +134,3 @@ the crowd is a mix of tones. To swap in different art, replace the PNG and adjus
 the per-pose column arrays / `variantCount` in `src/Sprites.fs` — that's the only
 file that needs to change. See `docs/authentic-graphics.md` for using the real
 game's `MAIN.DAT` sprites instead.
-
-## Exercises (good next tutorial steps)
-
-- Add lemming↔lemming awareness (Blockers) — needs each lemming to see others'
-  positions; pass a snapshot of `LemmingView`s into `Tick`.
-- More skills: Basher (horizontal), Builder, Floater, Bomber.
-- A spawn hatch and an exit door; count the saved lemmings.
-- Unit-test `Lemming.step` directly — no actors required.
