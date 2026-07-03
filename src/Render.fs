@@ -36,11 +36,16 @@ let private waterBody, waterTop = (42uy, 108uy, 208uy), (111uy, 179uy, 255uy)
 /// The hazard colour for an empty cell (brighter at the exposed pool surface —
 /// where the cell above is not the same hazard), or None.
 let private hazardColorAt (t: TerrainSnapshot) wx wy =
-    let i = wy * t.Width + wx
-    let aboveSame (mask: bool[]) = wy > 0 && mask.[i - t.Width]
-    if t.Lava.[i] then Some(if aboveSame t.Lava then lavaBody else lavaTop)
-    elif t.Water.[i] then Some(if aboveSame t.Water then waterBody else waterTop)
-    else None
+    // Bounds guard: the main view can be wider than the level, so callers pass
+    // coordinates past the level edge (sky there, never a hazard).
+    if wx < 0 || wx >= t.Width || wy < 0 || wy >= t.Height then
+        None
+    else
+        let i = wy * t.Width + wx
+        let aboveSame (mask: bool[]) = wy > 0 && mask.[i - t.Width]
+        if t.Lava.[i] then Some(if aboveSame t.Lava then lavaBody else lavaTop)
+        elif t.Water.[i] then Some(if aboveSame t.Water then waterBody else waterTop)
+        else None
 
 let private paint (data: byte[]) (p: int) (r: byte, g: byte, b: byte) =
     data.[p] <- r

@@ -55,10 +55,15 @@ type TerrainSnapshot =
     member t.IsSteel(x, y) =
         x >= 0 && x < t.Width && y >= 0 && y < t.Height && t.Steel.[y * t.Width + x]
 
-    /// True if a stationary Blocker occupies this cell. Walkers turn around here.
+    /// True if a stationary Blocker blocks this cell. Walkers turn around here.
     /// This is how lemmings "see" each other — only as impassable cells in the
     /// shared snapshot, never as direct references to other actors.
-    member t.IsBlocked(x, y) = t.Blockers.Contains(x, y)
+    /// A blocker blocks a small vertical field (its cell ± a few px), not just
+    /// its exact pixel — otherwise a walker on a bump or slope (auto-step-up
+    /// reaches 3px) would be 1px off and slip straight past it.
+    member t.IsBlocked(x, y) =
+        not t.Blockers.IsEmpty
+        && [ -4 .. 4 ] |> List.exists (fun dy -> t.Blockers.Contains(x, y + dy))
 
     /// The hazard (if any) at this cell.
     member t.HazardAt(x, y) =

@@ -65,6 +65,9 @@ let private step (terrain: TerrainSnapshot) (s: State) : State * Mutation list =
     elif terrain.HazardAt(s.X, s.Y) = Some Lava then
         { s with Alive = false }, []
     elif terrain.HazardAt(s.X, s.Y) = Some Water then
+        // The fuse keeps burning underwater too — see the comment above.
+        let s = if s.Fuse > 1 then { s with Fuse = s.Fuse - 1 } else s
+
         if s.Submerged >= drownAfter then
             { s with Alive = false }, []
         else
@@ -100,7 +103,10 @@ let private step (terrain: TerrainSnapshot) (s: State) : State * Mutation list =
             // ahead stops the dig.
             let d = s.Dir
 
-            if terrain.IsSteel(s.X + d, s.Y + 1) then
+            // Steel anywhere in the column ahead (the full carved height) is
+            // impassable — the removal would skip it, so stop rather than walk
+            // through an uncarved cell.
+            if [ -10 .. 1 ] |> List.exists (fun k -> terrain.IsSteel(s.X + d, s.Y + k)) then
                 { s with Skill = Walker }, []
             elif [ 1..3 ] |> List.exists (fun k -> terrain.IsSolid(s.X + d * k, s.Y + k)) then
                 // Carve the head/body column ahead AND one row below the feet
@@ -154,9 +160,11 @@ let private step (terrain: TerrainSnapshot) (s: State) : State * Mutation list =
                     [ 1..20 ]
                     |> List.exists (fun k -> terrain.IsSolid(s.X + d * k, s.Y) || terrain.IsSolid(s.X + d * k, s.Y - 5))
 
-                // Steel directly ahead (at body height) is impassable — stop bashing.
+                // Steel anywhere in the column ahead (the full carved height) is
+                // impassable — the removal would skip it, so stop bashing rather
+                // than walk through an uncarved cell.
                 let steelAhead =
-                    terrain.IsSteel(s.X + d, s.Y) || terrain.IsSteel(s.X + d, s.Y - 5)
+                    [ -10 .. 0 ] |> List.exists (fun k -> terrain.IsSteel(s.X + d, s.Y + k))
 
                 if steelAhead || not wallWithinReach then
                     { s with Skill = Walker }, [] // hit steel, or broke out into open space

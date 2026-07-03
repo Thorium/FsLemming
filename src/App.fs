@@ -176,14 +176,20 @@ canvas.addEventListener (
         let px = (me.clientX - rect.left) / rect.width * float canvas.width + float camX
         let py = (me.clientY - rect.top) / rect.height * float canvas.height
 
+        // Only clicks near a lemming count — without a cap, a stray click at the
+        // far side of the map would assign (and spend!) a skill on whoever
+        // happens to be nearest. One sprite's size of slack feels forgiving.
+        let clickRadius = 16.0
+
         let nearest =
             lastViews
             |> List.filter (fun v -> v.Alive)
-            |> List.sortBy (fun v -> (float v.X - px) ** 2.0 + (float v.Y - py) ** 2.0)
+            |> List.map (fun v -> v, (float v.X - px) ** 2.0 + (float v.Y - py) ** 2.0)
+            |> List.sortBy snd
             |> List.tryHead
 
         match nearest with
-        | Some v ->
+        | Some(v, d2) when d2 <= clickRadius * clickRadius ->
             // Spend one from the inventory; only assign if one was in stock.
             async {
                 let! granted = game.TryAssign(v.Id, selected)
@@ -192,8 +198,8 @@ canvas.addEventListener (
                 if granted then do! refreshCounts ()
             }
             |> Async.StartImmediate
-        | None ->
-            // Clicked empty space — red ripple at the click point.
+        | _ ->
+            // Clicked empty space (or too far from anyone) — red ripple there.
             clickFx <- Some(int px, int py, false, fxLife)
 )
 

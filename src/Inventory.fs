@@ -11,6 +11,7 @@ open FsLemming.Types
 /// one. This is decision 1 in docs/design.md, in miniature.
 type private Msg =
     | TryTake of Skill * AsyncReplyChannel<bool>
+    | Refund of Skill // give one back (an assignment raced with the lemming retiring)
     | Remaining of AsyncReplyChannel<Map<Skill, int>>
 
 type Inventory(initial: Map<Skill, int>) =
@@ -34,6 +35,9 @@ type Inventory(initial: Map<Skill, int>) =
                                 | _ ->
                                     reply.Reply false // none left (or never offered)
                                     counts
+                            | Refund skill ->
+                                let n = counts |> Map.tryFind skill |> Option.defaultValue 0
+                                Map.add skill (n + 1) counts
                             | Remaining reply ->
                                 reply.Reply counts
                                 counts
@@ -41,7 +45,8 @@ type Inventory(initial: Map<Skill, int>) =
                             eprintfn "Inventory failed on a message: %O" ex
                             (match msg with
                              | TryTake(_, reply) -> reply.Reply false
-                             | Remaining reply -> reply.Reply counts)
+                             | Remaining reply -> reply.Reply counts
+                             | Refund _ -> ())
                             counts
 
                     return! loop next
@@ -51,6 +56,10 @@ type Inventory(initial: Map<Skill, int>) =
 
     /// Atomically spend one of `skill`. Returns true if one was available.
     member _.TryTake(skill) = agent.PostAndAsyncReply(fun rc -> TryTake(skill, rc))
+
+    /// Give one `skill` back — used when a granted assignment couldn't be
+    /// delivered (the lemming retired while the take was in flight).
+    member _.Refund(skill) = agent.Post(Refund skill)
 
     /// Current counts, for the UI.
     member _.Remaining() = agent.PostAndAsyncReply Remaining

@@ -64,8 +64,22 @@ type Game(level: Level) =
                     return false
                 else
                     let! granted = inventory.TryTake skill
-                    if granted then l.SetSkill skill
-                    return granted
+                    // The lemming may have retired (exited/died) while the take
+                    // was in flight — its agent is stopped and would silently
+                    // drop the SetSkill. Re-check and refund rather than burn a
+                    // unit on a ghost. (Retirement removes it from `active` and
+                    // posts Stop in one step, and this check + SetSkill run in
+                    // one step too, so if it's still here the SetSkill message
+                    // is queued ahead of any future Stop.)
+                    if granted then
+                        if active |> List.exists (fun l2 -> l2.Id = id) then
+                            l.SetSkill skill
+                            return true
+                        else
+                            inventory.Refund skill
+                            return false
+                    else
+                        return false
             | None -> return false
         }
 
@@ -88,7 +102,9 @@ type Game(level: Level) =
             if outcome () = Playing
                && spawned < level.SpawnCount
                && elapsed >= openDelay
-               && (elapsed - openDelay) % level.SpawnEveryTicks = 0 then
+               // max 1: a zero interval (hand-edited/buggy level data) would be
+               // `x % 0` = NaN under Fable — no lemming would ever spawn.
+               && (elapsed - openDelay) % max 1 level.SpawnEveryTicks = 0 then
                 // Prepend (O(1)); order among lemmings doesn't matter, they're independent.
                 active <- Lemming(nextId, level.Hatch.X + level.Hatch.W / 2, level.Hatch.Y) :: active
                 nextId <- nextId + 1
