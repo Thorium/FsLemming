@@ -24,8 +24,16 @@ let mutable private lava: bool[] = Array.zeroCreate (W * H)
 let mutable private water: bool[] = Array.zeroCreate (W * H)
 let mutable private hatch = { X = 16; Y = 108; W = 8; H = 4 }
 let mutable private exit = { X = 212; Y = 116; W = 16; H = 10 }
-// Brush: dirt | steel | lava | water | erase | hatch | exit
+// Brush: dirt | steel | lava | water | erase | hatch | exit | decor | pillar
 let mutable private placeMode = "dirt"
+
+// Cosmetic layers: scenery props (stamped on the surface) and pillar regions
+// (dragged out as rectangles; the game dresses those blocks as fluted columns).
+let mutable private decor: Decor list = []
+let mutable private pillars: Region list = []
+let mutable private decorV = 0 // next prop variant; cycles so stamps vary
+let mutable private pillarStart: (int * int) option = None
+let mutable private pillarPreview: Region option = None
 
 let private groundTerrain w =
     let a = Array.zeroCreate (w * H)
@@ -85,6 +93,30 @@ let private redraw () =
     marker hatch "#7a4a1e" "H"
     marker exit "#0c8a36" "E"
 
+    // Cosmetic overlays: pillar regions (translucent, outlined) and decor stamps.
+    let pillarRect (p: Region) =
+        let x, y = float p.X * scaleX, float p.Y * scaleY
+        let w, h = float p.W * scaleX, float p.H * scaleY
+        ctx?fillStyle <- "rgba(216, 196, 137, 0.3)"
+        ctx.fillRect (x, y, w, h)
+        ctx?strokeStyle <- "#d8c489"
+        ctx.lineWidth <- 1.0
+        ctx.strokeRect (x, y, w, h)
+
+    for p in pillars do
+        pillarRect p
+
+    match pillarPreview with
+    | Some p -> pillarRect p
+    | None -> ()
+
+    for d in decor do
+        let x, y = float d.X * scaleX, float d.Y * scaleY
+        ctx?fillStyle <- "#3f9e42"
+        ctx.fillRect (x - 2.0, y - 8.0, 5.0, 8.0)
+        ctx?strokeStyle <- "#ffffff"
+        ctx.strokeRect (x - 2.0, y - 8.0, 5.0, 8.0)
+
 // ---- Editing: draw/erase terrain, place hatch/exit (click or drag) ----------
 let mutable private painting = false
 
@@ -101,10 +133,21 @@ let private brush (wx: int) (wy: int) (mat: string) =
                 lava.[i] <- (mat = "lava")
                 water.[i] <- (mat = "water")
 
-let private editAt (clientX: float) (clientY: float) =
+let private toWorld (clientX: float) (clientY: float) =
     let r = canvas.getBoundingClientRect ()
-    let wx = int ((clientX - r.left) / r.width * float W)
-    let wy = int ((clientY - r.top) / r.height * float H)
+    int ((clientX - r.left) / r.width * float W), int ((clientY - r.top) / r.height * float H)
+
+/// The ground row a stamped prop stands on: first solid cell at or below the
+/// click, so props snap to the surface just like the generator places them.
+let private surfaceBelow wx wy =
+    if wx < 0 || wx >= W then None
+    else [ max 0 wy .. H - 1 ] |> List.tryFind (fun y -> terrain.[y * W + wx])
+
+let private normRect x0 y0 x1 y1 : Region =
+    { X = min x0 x1; Y = min y0 y1; W = abs (x1 - x0) + 1; H = abs (y1 - y0) + 1 }
+
+let private editAt (clientX: float) (clientY: float) =
+    let wx, wy = toWorld clientX clientY
 
     match placeMode with
     | "dirt" | "steel" | "lava" | "water" | "erase" -> brush wx wy placeMode
@@ -115,21 +158,65 @@ let private editAt (clientX: float) (clientY: float) =
     redraw ()
 
 canvas.addEventListener ("mousedown", fun e ->
-    painting <- true
     let me = e :?> MouseEvent
-    editAt me.clientX me.clientY)
+    let wx, wy = toWorld me.clientX me.clientY
 
-canvas.addEventListener ("mousemove", fun e ->
-    if painting then
-        let me = e :?> MouseEvent
+    match placeMode with
+    | "decor" ->
+        // Toggle: a click near an existing prop removes it, elsewhere stamps a
+        // new one (variants cycle so repeated stamps vary).
+        match decor |> List.tryFind (fun d -> abs (d.X - wx) <= 3 && abs (d.Y - wy) <= 8) with
+        | Some d -> decor <- decor |> List.filter ((<>) d)
+        | None ->
+            match surfaceBelow wx wy with
+            | Some y ->
+                decor <- { X = wx; Y = y; V = decorV } :: decor
+                decorV <- (decorV + 1) % 4
+            | None -> ()
+
+        redraw ()
+    | "pillar" ->
+        // A click inside an existing pillar removes it; otherwise start
+        // dragging a new region (committed on mouseup).
+        match pillars |> List.tryFind (fun p -> wx >= p.X && wx < p.X + p.W && wy >= p.Y && wy < p.Y + p.H) with
+        | Some p ->
+            pillars <- pillars |> List.filter ((<>) p)
+            redraw ()
+        | None -> pillarStart <- Some(wx, wy)
+    | _ ->
+        painting <- true
         editAt me.clientX me.clientY)
 
-window.addEventListener ("mouseup", fun _ -> painting <- false)
+canvas.addEventListener ("mousemove", fun e ->
+    let me = e :?> MouseEvent
+
+    match pillarStart with
+    | Some(sx, sy) ->
+        let wx, wy = toWorld me.clientX me.clientY
+        pillarPreview <- Some(normRect sx sy wx wy)
+        redraw ()
+    | None ->
+        if painting then
+            editAt me.clientX me.clientY)
+
+window.addEventListener ("mouseup", fun _ ->
+    painting <- false
+
+    match pillarPreview with
+    | Some p ->
+        if p.W >= 4 && p.H >= 6 then
+            pillars <- p :: pillars
+
+        pillarStart <- None
+        pillarPreview <- None
+        redraw () // also clears a too-small preview rectangle
+    | None -> pillarStart <- None)
 
 // Brush selection. Each button highlights itself (CSS .selected) and sets the mode.
 let private brushButtons =
     [ "tool-dirt", "dirt"; "tool-steel", "steel"; "tool-lava", "lava"; "tool-water", "water"
-      "tool-erase", "erase"; "place-hatch", "hatch"; "place-exit", "exit" ]
+      "tool-erase", "erase"; "tool-decor", "decor"; "place-pillar", "pillar"
+      "place-hatch", "hatch"; "place-exit", "exit" ]
 
 let private selectBrush (mode: string) =
     placeMode <- mode
@@ -168,6 +255,8 @@ let private thresholdImage (img: HTMLImageElement) =
     steel <- Array.zeroCreate (w * H)
     lava <- Array.zeroCreate (w * H)
     water <- Array.zeroCreate (w * H)
+    decor <- [] // stale coordinates would float over the new terrain
+    pillars <- []
     redraw ()
 
 (byId "img").addEventListener (
@@ -216,6 +305,8 @@ let private buildLevel () : Level =
       Water = water
       Hatch = hatch
       Exit = exit
+      Decor = decor
+      Pillars = pillars
       SpawnCount = parseIntOr 10 (valOf "f-spawn")
       SpawnEveryTicks = parseIntOr 14 (valOf "f-every")
       SaveTarget = parseIntOr 5 (valOf "f-save")

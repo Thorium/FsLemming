@@ -1,31 +1,31 @@
 // Level-solvability checker. Replicates src/Lemming.fs step() + the World's
 // terrain mutations (steel-aware) and runs ONE lemming through a scripted plan of
 // skill assignments, reporting whether it reaches the exit. If a single lemming
-// can solve the route, the crowd can too (with blockers/timing). Used to verify
-// every campaign puzzle in tools/gen_levels.fsx is actually solvable.
+// can solve the route, the crowd can too (with blockers/timing).
+//
+// It verifies the ACTUAL shipped data: it decodes src/levels.json (the output of
+// gen_levels.fsx, surface relief included) rather than rebuilding terrain from a
+// second copy of the rect lists. Regenerate levels, then re-run this.
 //
 // Run with:  dotnet fsi tools/solver.fsx
+
+open System.IO
+open System.Text.Json
 
 let H = 150
 type Lvl = { W: int; solid: bool[]; steel: bool[]; lava: bool[]; water: bool[] }
 
-/// Build masks the same way gen_levels does: rects = dirt; hazards carve lava/water
-/// pits and add solid+indestructible steel.
-let build w (rects: (int*int*int*int) list) (haz: (string*int*int*int*int) list) =
-    let size = w*H
-    let solid, steel, lava, water = Array.zeroCreate size, Array.zeroCreate size, Array.zeroCreate size, Array.zeroCreate size
-    let fill (m: bool[]) x0 y0 ww hh v =
-        for y in y0..y0+hh-1 do
-            for x in x0..x0+ww-1 do
-                if x>=0 && x<w && y>=0 && y<H then m.[y*w+x] <- v
-    for (x0,y0,ww,hh) in rects do fill solid x0 y0 ww hh true
-    for (k,x,y,ww,hh) in haz do
-        match k with
-        | "steel" -> fill steel x y ww hh true; fill solid x y ww hh true
-        | "lava" -> fill lava x y ww hh true; fill solid x y ww hh false
-        | "water" -> fill water x y ww hh true; fill solid x y ww hh false
-        | _ -> failwithf "bad hazard %s" k
-    { W=w; solid=solid; steel=steel; lava=lava; water=water }
+/// Expand RLE runs (alternating empty/solid, starting empty) into a flat grid.
+let rleDecode (runs: int seq) size =
+    let cells: bool[] = Array.zeroCreate size
+    let mutable i = 0
+    let mutable v = false
+    for run in runs do
+        for _ in 1..run do
+            if i < size then cells.[i] <- v
+            i <- i + 1
+        v <- not v
+    cells
 
 type S = { X:int; Y:int; Dir:int; Skill:string; Counter:int; FallDist:int; Submerged:int; Alive:bool }
 type Mut = RR of int*int*int*int | AT of int*int*int*int
@@ -106,17 +106,47 @@ let run (lv:Lvl) (sx,sy,sd) (ex,ey,ew,eh) (plan:(int*string) list) maxT =
         t<-t+1
     res
 
-let private groundOf w = (0,126,w,24)
-let check name lv start exit plan = printfn "  %-22s %s" name (run lv start exit plan 9000)
+// ---- Load the shipped campaign ------------------------------------------------
+let jsonPath = Path.Combine(__SOURCE_DIRECTORY__, "..", "src", "levels.json")
+let doc = JsonDocument.Parse(File.ReadAllText jsonPath)
 
-printfn "Campaign solvability:"
-check "1 bash+float"  (build 280 [ groundOf 280; (0,90,180,8); (110,68,18,30) ] []) (16,89,1)  (220,116,16,10) [ (90,"Basher"); (160,"Floater") ]
-check "2 bash+build"  (build 280 [ groundOf 280; (110,96,18,30); (220,114,60,12) ] []) (16,125,1) (244,104,16,12) [ (100,"Basher"); (206,"Builder") ]
-check "3 dig+bash"    (build 260 [ groundOf 260; (0,110,200,8); (200,60,18,89) ] []) (16,109,1) (230,116,16,10) [ (100,"Digger"); (190,"Basher") ]
-check "4 mine+build"  (build 260 [ groundOf 260; (0,60,120,90); (200,114,40,12) ] []) (16,59,1)  (220,104,16,12) [ (60,"Miner"); (190,"Builder") ]
-check "5 build+climb" (build 280 [ groundOf 280; (180,40,16,86) ] [ ("lava",100,126,12,24) ]) (16,125,1) (180,30,16,10) [ (99,"Builder"); (170,"Climber") ]
-check "6 bridge+bash" (build 280 [ (0,126,124,24); (136,126,144,24); (190,96,18,30) ] []) (16,125,1) (250,116,16,10) [ (123,"Builder"); (180,"Basher") ]
-check "7 bash+climb"  (build 280 [ groundOf 280; (90,96,18,30); (180,40,16,86) ] []) (16,125,1) (180,30,16,10) [ (80,"Basher"); (165,"Climber") ]
-check "8 mine+bash"   (build 260 [ groundOf 260; (0,60,120,90); (190,96,18,30) ] []) (16,59,1)  (240,116,16,10) [ (60,"Miner"); (180,"Basher") ]
-check "9 mine+bash+build" (build 600 [ groundOf 600; (0,60,150,90); (320,96,18,30) ] [ ("lava",430,126,12,24) ]) (16,59,1) (560,116,16,10) [ (90,"Miner"); (310,"Basher"); (429,"Builder") ]
-check "10 build+build" (build 360 [ groundOf 360 ] [ ("steel",60,126,40,24); ("lava",120,126,12,24); ("water",210,126,12,24) ]) (16,125,1) (332,116,16,10) [ (119,"Builder"); (209,"Builder") ]
+let runsOf (e: JsonElement) (field: string) =
+    e.GetProperty(field).EnumerateArray() |> Seq.map (fun r -> r.GetInt32())
+
+let rectOf (e: JsonElement) (field: string) =
+    let r = e.GetProperty field
+    r.GetProperty("x").GetInt32(), r.GetProperty("y").GetInt32(), r.GetProperty("w").GetInt32(), r.GetProperty("h").GetInt32()
+
+// One scripted route per campaign level, in order (triggerX, skill).
+let plans =
+    [ [ (90,"Basher"); (160,"Floater") ]        // 1 bash the ledge wall, float off the cliff
+      [ (100,"Basher"); (206,"Builder") ]       // 2 bash the wall, build onto the exit ledge
+      [ (100,"Digger"); (190,"Basher") ]        // 3 dig through the slab, bash to the exit
+      [ (60,"Miner"); (190,"Builder") ]         // 4 mine off the plateau, build onto the ledge
+      [ (99,"Builder"); (170,"Climber") ]       // 5 bridge the lava, climb the wall
+      [ (123,"Builder"); (180,"Basher") ]       // 6 bridge the gap, bash the wall
+      [ (80,"Basher"); (165,"Climber") ]        // 7 bash the wall, climb the tall one
+      [ (60,"Miner"); (180,"Basher") ]          // 8 mine off the plateau, bash the wall
+      [ (90,"Miner"); (310,"Basher"); (429,"Builder") ] // 9 mine, bash, bridge the lava
+      [ (119,"Builder"); (209,"Builder") ] ]    // 10 bridge the lava AND the water
+
+let levels = doc.RootElement.EnumerateArray() |> Seq.toList
+
+if List.length levels <> List.length plans then
+    failwithf "levels.json has %d levels but solver has %d plans" (List.length levels) (List.length plans)
+
+printfn "Campaign solvability (from src/levels.json):"
+
+for e, plan in List.zip levels plans do
+    let w = e.GetProperty("width").GetInt32()
+    let size = w * H
+    let lv =
+        { W = w
+          solid = rleDecode (runsOf e "terrain") size
+          steel = rleDecode (runsOf e "steel") size
+          lava = rleDecode (runsOf e "lava") size
+          water = rleDecode (runsOf e "water") size }
+    // Spawn exactly like Game.fs does: hatch centre, hatch top (then fall).
+    let hx, hy, hw, _ = rectOf e "hatch"
+    let name = e.GetProperty("name").GetString()
+    printfn "  %-24s %s" name (run lv (hx + hw / 2, hy, 1) (rectOf e "exit") plan 9000)

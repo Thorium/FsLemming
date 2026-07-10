@@ -59,12 +59,31 @@ let private rleDecode (runs: int[]) (size: int) : bool[] =
         value <- not value
     cells
 
-let private region (o: obj) : Region = { X = o?x; Y = o?y; W = o?w; H = o?h }
+// The known JSON shapes, typed as erased anonymous records: `unbox` still marks
+// the trust boundary (no runtime validation), but every field access after it
+// is compiler-checked instead of stringly-dynamic.
+let private region (o: {| x: int; y: int; w: int; h: int |}) : Region = { X = o.x; Y = o.y; W = o.w; H = o.h }
 
 /// Decode an optional RLE field into a flat mask; absent → all-false (handles
 /// older JSON written before steel/lava/water existed).
 let private maskOf (v: obj) (size: int) : bool[] =
     if isNull (box v) then Array.zeroCreate size else rleDecode (unbox v) size
+
+/// Decode the optional decor array; absent → no scenery (older JSON).
+let private decorOf (v: obj) : Decor list =
+    if isNull (box v) then
+        []
+    else
+        unbox<{| x: int; y: int; v: int |}[]> v
+        |> Array.map (fun d -> { X = d.x; Y = d.y; V = d.v }: Decor)
+        |> Array.toList
+
+/// Decode the optional pillars array; absent → none (older JSON).
+let private pillarsOf (v: obj) : Region list =
+    if isNull (box v) then
+        []
+    else
+        unbox<{| x: int; y: int; w: int; h: int |}[]> v |> Array.map region |> Array.toList
 
 let private decodeLevel (o: obj) : Level =
     let width: int = o?width
@@ -83,6 +102,8 @@ let private decodeLevel (o: obj) : Level =
       Water = maskOf (o?water) size
       Hatch = region o?hatch
       Exit = region o?exit
+      Decor = decorOf o?decor
+      Pillars = pillarsOf o?pillars
       SpawnCount = o?spawnCount
       SpawnEveryTicks = o?spawnEveryTicks
       SaveTarget = o?saveTarget
@@ -136,6 +157,13 @@ let private levelObj (lvl: Level) =
           "water", box (rleEncode lvl.Water)
           "hatch", regionObj lvl.Hatch
           "exit", regionObj lvl.Exit
+          "decor",
+          box (
+              lvl.Decor
+              |> List.map (fun d -> createObj [ "x", box d.X; "y", box d.Y; "v", box d.V ])
+              |> List.toArray
+          )
+          "pillars", box (lvl.Pillars |> List.map regionObj |> List.toArray)
           "spawnCount", box lvl.SpawnCount
           "spawnEveryTicks", box lvl.SpawnEveryTicks
           "saveTarget", box lvl.SaveTarget

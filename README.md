@@ -71,7 +71,20 @@ dotnet fsi tools/gen_levels.fsx   # rewrites src/levels.json
 ```
 
 Edit the level list in `tools/gen_levels.fsx` and re-run to change the campaign —
-the engine never changes.
+the engine never changes. Besides the authored shapes, the generator adds gentle
+surface relief (1–2px mounds — walkers auto-step 3px, so routes are untouched)
+and scenery spots: tiny `{x, y, v}` entries whose look is decided by the level's
+*theme* at render time (grass tufts and mushrooms on earth, torches in hell),
+drawn faintly so they stay backdrop. Scenery never collides, and it disappears
+with the ground it stands on. The generator also hangs organic ceiling masses
+from the top edge — bumpy cave roofs with the odd stalactite drip, placed only
+where no route can reach them — and the renderer adds a faint procedural sky
+backdrop (roots, pillars, chains, stalactites) from a coordinate hash.
+After regenerating, verify every puzzle still solves:
+
+```bash
+dotnet fsi tools/solver.fsx       # replays each level from src/levels.json
+```
 
 There's also an **in-browser level editor** at `editor.html` (linked from the
 game): import an image (dark pixels → solid terrain), place the hatch/exit, set

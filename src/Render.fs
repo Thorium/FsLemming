@@ -28,6 +28,49 @@ let private themeColors theme =
 // theme's dirt so players can see what's indestructible.
 let private steelTop, steelBody = (176uy, 184uy, 200uy), (104uy, 112uy, 130uy)
 
+/// Deterministic coordinate hash for the procedural sky backdrop. Stable frame
+/// to frame (no shimmer) and derived purely from position, so it needs no level
+/// data at all. Constants kept small on purpose: Fable ints are JS numbers, and
+/// huge multiplies would lose exactness.
+let inline private hash (x: int) (y: int) =
+    let h = x * 92821 + y * 31337
+    let h = h ^^^ (h >>> 7)
+    let h = h * 2999
+    abs (h ^^^ (h >>> 11))
+
+let private lighten (r: byte, g: byte, b: byte) k =
+    byte (min 255 (int r + k)), byte (min 255 (int g + k)), byte (min 255 (int b + k))
+
+let private darken (r: byte, g: byte, b: byte) k =
+    byte (max 0 (int r - k)), byte (max 0 (int g - k)), byte (max 0 (int b - k))
+
+/// Faint background material hanging in the sky, in the spirit of the original
+/// game's backdrops: roots on earth, ruined pillars on stone, chains on brick,
+/// stalactites in hell. Callers paint hits a couple of shades above the sky
+/// colour so it stays firmly backdrop and never competes with the play field.
+let private skyDetail theme (h: int) wx wy =
+    match theme with
+    | Earth -> // hanging roots of uneven length, swaying a pixel with depth
+        let band = wx / 6
+        hash band 7 % 3 = 0
+        && wy < 10 + hash band 13 % 22
+        && wx % 6 = 2 + hash band (wy / 7) % 2
+    | Stone -> // distant ruined pillars, floor to ceiling, with capital and base
+        let band = wx / 44
+        hash band 3 % 2 = 0
+        && (let dx = abs (wx - (band * 44 + 10 + hash band 5 % 24))
+            dx <= 2 || (dx <= 4 && (wy < 4 || wy >= h - 4)))
+    | Brick -> // hanging chains, dotted so the links read
+        let band = wx / 24
+        hash band 9 % 2 = 0
+        && wx = band * 24 + 2 + hash band 11 % 20
+        && wy < 12 + hash band 15 % 20
+        && wy % 3 <> 2
+    | Hell -> // stalactites on the cave ceiling
+        let band = wx / 12
+        let cx = band * 12 + 3 + hash band 17 % 6
+        wy < 5 + hash band 19 % 14 - abs (wx - cx) * 3
+
 // Hazard fills, painted into the pixel buffer so solid terrain occludes them —
 // the pools then read as recessed pits, not slabs sitting on top of the ground.
 let private lavaBody, lavaTop = (216uy, 51uy, 15uy), (255uy, 154uy, 51uy)
@@ -77,9 +120,20 @@ let draw
 
     let data: byte[] = unbox img.data
 
+    // Extra shades derived from the theme palette: the shaded underside of
+    // overhangs/ceilings, the near-sky tint for backdrop material, and the
+    // lighter stonework of cosmetic pillars.
+    let bodyDk = darken bodyA 16
+    let skyHi = lighten skyC 15
+    let pilHi = lighten bodyB 34
+    let pilBand = lighten bodyB 26
+    let pilBody = lighten bodyB 16
+
     // Terrain: only the visible window [camX, camX+viewW). Grass on the top
-    // surface, dithered earth below; empty cells show sky, or a hazard pool where
-    // one has been carved into the ground (so the terrain occludes its edges).
+    // surface, dithered earth below (with a darker rim on exposed undersides so
+    // ceilings and overhangs read); empty cells show sky — with faint backdrop
+    // material — or a hazard pool where one has been carved into the ground
+    // (so the terrain occludes its edges).
     for vy in 0 .. h - 1 do
         for vx in 0 .. viewW - 1 do
             let wx = camX + vx
@@ -93,17 +147,77 @@ let draw
                         if exposedTop then steelTop else steelBody // indestructible
                     elif exposedTop then
                         topC
-                    elif level.Theme = Brick && vy % 4 = 0 then bodyA // mortar line
-                    elif (wx + vy) % 2 = 0 then bodyA
-                    else bodyB
+                    elif vy = h - 1 || not terrain.Solid.[(vy + 1) * tw + wx] then
+                        bodyDk // shaded underside of a ceiling or overhang
+                    else
+                        // A pillar region dresses the block as a fluted
+                        // roman/egyptian column: banded capital and base,
+                        // vertical flutes between, darkened rims for roundness.
+                        // Purely a paint job on the solid mask, so a bashed
+                        // tunnel carves straight through the fluting.
+                        let pillar =
+                            level.Pillars
+                            |> List.tryFind (fun p -> wx >= p.X && wx < p.X + p.W && vy >= p.Y && vy < p.Y + p.H)
+
+                        match pillar with
+                        | Some p ->
+                            if vy <= p.Y + 2 || vy >= p.Y + p.H - 3 then pilBand // capital / base
+                            elif wx = p.X || wx = p.X + p.W - 1 then bodyA // rounded rim
+                            else
+                                match (wx - p.X) % 3 with
+                                | 1 -> pilHi // lit ridge of a flute
+                                | 2 -> pilBody
+                                | _ -> bodyA // flute groove
+                        | None ->
+                            if level.Theme = Brick && vy % 4 = 0 then bodyA // mortar line
+                            elif (wx + vy) % 2 = 0 then bodyA
+                            else bodyB
                 else
                     match hazardColorAt terrain wx vy with
                     | Some c -> c
-                    | None -> skyC
+                    | None -> if skyDetail level.Theme h wx vy then skyHi else skyC
 
             paint data ((vy * viewW + vx) * 4) color
 
     ctx.putImageData (img, 0., 0.)
+
+    // Theme scenery: only small, quiet ground props (tufts, mushrooms, torches),
+    // drawn semi-transparent so they read as backdrop and never compete with the
+    // lemmings. A prop vanishes once the ground it stands on is dug away, and is
+    // drawn behind everything that matters — lemmings, hatch and exit paint over it.
+    ctx?globalAlpha <- 0.55
+
+    for d in level.Decor do
+        if d.X + 16 >= camX && d.X - 16 < camX + viewW && terrain.IsSolid(d.X, d.Y) then
+            // Tiny pixel-art: rects relative to the prop's base cell (dy up = negative).
+            let r (color: string) dx dy w h =
+                ctx?fillStyle <- color
+                ctx.fillRect (float (d.X - camX + dx), float (d.Y + dy), float w, float h)
+
+            match level.Theme, d.V % 2 with
+            | Earth, 0 -> // grass tuft
+                r "#3f9e42" -2 -3 1 3
+                r "#2e7d32" 0 -4 1 4
+                r "#3f9e42" 2 -3 1 3
+            | Earth, _ -> // mushroom
+                r "#d8cfc0" -1 -4 2 4
+                r "#c23b2c" -3 -6 6 2
+                r "#f0e8dc" 0 -6 1 1
+            | Stone, _ -> // dry tuft
+                r "#a89858" -2 -3 1 3
+                r "#948448" 0 -4 1 4
+                r "#a89858" 2 -3 1 3
+            | Brick, _ -> // weeds in the paving cracks
+                r "#5a7a4a" -2 -3 1 3
+                r "#4a6a3e" 0 -4 1 4
+                r "#5a7a4a" 2 -3 1 3
+            | Hell, _ -> // torch with a flickering flame
+                r "#2c1a14" -1 -6 2 6
+                let f = (clock / 4 + d.X) % 3
+                r "#ff8a1e" -1 (-9 - f) 2 (3 + f)
+                r "#ffd23c" -1 (-8 - f) 1 2
+
+    ctx?globalAlpha <- 1.0
 
     // Hatch (the level-start trapdoor) and exit (a little door), offset by camera.
     // The hatch is drawn at 2x its logical size — centred horizontally on the spawn

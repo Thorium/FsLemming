@@ -32,6 +32,14 @@ type HazardKind =
 [<Struct>]
 type Region = { X: int; Y: int; W: int; H: int }
 
+/// A purely decorative scenery prop standing on the terrain surface: (X, Y) is
+/// the ground row it stands on, V picks one of a few shapes. It never collides —
+/// presentation only. The THEME decides what a variant looks like (Earth: grass
+/// tuft/mushroom, Stone/Brick: tufts, Hell: torch), so re-theming a level
+/// re-skins its scenery for free.
+[<Struct>]
+type Decor = { X: int; Y: int; V: int }
+
 /// Immutable, read-only view of the terrain handed to every lemming each tick.
 ///
 /// This is the heart of the "no state leaking" idea: a lemming receives a COPY
@@ -122,6 +130,8 @@ type Level =
       Water: bool[] // deadly water cells
       Hatch: Region // where lemmings drop in
       Exit: Region // reach here to be saved
+      Decor: Decor list // theme-skinned scenery; never affects gameplay
+      Pillars: Region list // cosmetic: solid blocks drawn as fluted columns
       SpawnCount: int // how many lemmings the hatch releases
       SpawnEveryTicks: int // one lemming every N ticks
       SaveTarget: int // how many must reach the exit to win
