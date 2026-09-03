@@ -14,10 +14,12 @@ open FsLemming.Types
 /// public/lemmings.png and the indices below; nothing else changes.
 
 /// Pixel size of one (square) frame in the sheet.
+[<Literal>]
 let frameSize = 16
 
 /// Number of skin-tone rows in the sheet. MUST match SKINS.Length in
 /// tools/gen_sprites.fsx. The renderer spreads lemmings across these.
+[<Literal>]
 let variantCount = 4
 
 // Sheet columns grouped per pose. MUST match the FRAMES order in

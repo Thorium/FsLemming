@@ -7,12 +7,18 @@ type Skill =
     | Walker
     | Digger
     | Blocker
-    | Builder // lays a brick staircase up-and-forward
-    | Basher // digs a horizontal tunnel
-    | Miner // digs a diagonal tunnel down-and-forward
-    | Climber // scales vertical walls instead of turning
-    | Floater // drifts down slowly and survives any fall
-    | Bomber // arms a fuse, then explodes
+    /// lays a brick staircase up-and-forward
+    | Builder
+    /// digs a horizontal tunnel
+    | Basher
+    /// digs a diagonal tunnel down-and-forward
+    | Miner
+    /// scales vertical walls instead of turning
+    | Climber
+    /// drifts down slowly and survives any fall
+    | Floater
+    /// arms a fuse, then explodes
+    | Bomber
 
 /// Visual theme for a level (terrain palette + background tint).
 [<Struct>]
@@ -84,18 +90,26 @@ type TerrainSnapshot =
             else None
 
 /// The only way to change the world: ask the World actor to apply a mutation.
+[<Struct>]
 type Mutation =
-    | RemoveCircle of x: int * y: int * radius: int // diggers / bombers
-    | RemoveRect of x: int * y: int * w: int * h: int // bashers / miners
-    | AddTerrain of x: int * y: int * w: int * h: int // builders
+    /// diggers / bombers
+    | RemoveCircle of x: int * y: int * radius: int
+    /// bashers / miners
+    | RemoveRect of x: int * y: int * w: int * h: int
+    /// builders
+    | AddTerrain of x: int * y: int * w: int * h: int
 
 /// A particle effect to spawn where a lemming died (presentation only).
 [<Struct>]
 type EffectKind =
-    | Splat // fatal fall
-    | Explode // bomb went off
-    | Burn // walked into lava
-    | Drown // sank in water
+    /// fatal fall
+    | Splat
+    /// bomb went off
+    | Explode
+    /// walked into lava
+    | Burn
+    /// sank in water
+    | Drown
 
 /// A flat, serialisable snapshot of a lemming, produced each tick purely for
 /// rendering. The renderer never sees a lemming's private state — only this.

@@ -25,8 +25,10 @@ let BODY = [| 43uy; 79uy; 224uy; 255uy |]
 let DARK = [| 28uy; 28uy; 48uy; 255uy |]
 let WHITE = [| 240uy; 242uy; 255uy; 255uy |]
 let FEET = [| 255uy; 150uy; 45uy; 255uy |]
-let BRICK = [| 165uy; 110uy; 70uy; 255uy |] // brick a builder carries / lays
-let PICK = [| 228uy; 232uy; 242uy; 255uy |] // miner's steel pickaxe (bright, visible)
+/// brick a builder carries / lays
+let BRICK = [| 165uy; 110uy; 70uy; 255uy |]
+/// miner's steel pickaxe (bright, visible)
+let PICK = [| 228uy; 232uy; 242uy; 255uy |]
 let TRANSPARENT = [| 0uy; 0uy; 0uy; 0uy |]
 
 let SKINS =
@@ -73,13 +75,15 @@ let fall1 =
 
 // Digger: crouched in the hole, scooping dirt — hands pump DOWN (DIG0) then UP
 // (DIG1) while the head stays put, so the arms clearly alternate.
-let DIG0 = // hands down, scooping into the dirt
+/// hands down, scooping into the dirt
+let DIG0 =
     [ "................"; "................"; "................"; "................"
       "....gggggg......"; "...gwwsswwg....."; "...gwksskwg....."; "...gssssssg....."
       "...bsssssb......"; "...b.bbb.b......"; "...o.bbb.o......"; "....bb.bb......."
       "....oo.oo......."; "................"; "................"; "................" ]
 
-let DIG1 = // hands up, tossing the dirt out
+/// hands up, tossing the dirt out
+let DIG1 =
     [ "................"; "....o....o......"; "....b....b......"; "....b....b......"
       "....gggggg......"; "...gwwsswwg....."; "...gwksskwg....."; "...gssssssg....."
       "....sssss......."; "....bbbbb......."; "....bbbbb......."; "....bb.bb......."
@@ -95,13 +99,15 @@ let bash1 =
 
 // Blocker: arms straight out at 90° (held still); the HEAD turns side-to-side
 // ("no") between frames, arms/body/feet stay put.
-let BLOCK0 = // head turned left
+/// head turned left
+let BLOCK0 =
     [ "................"; "...gggggg......."; "..gggggggg......"; "..gssssssg......"
       "..gwwsswwg......"; "..gwksskwg......"; "..gssssssg......"; "...sssss........"
       "..obbbbbbbbbbo.."; ".....bbbbb......"; ".....bbbbb......"; ".....bbbbb......"
       ".....bb.bb......"; "....oo.oo......."; "................"; "................" ]
 
-let BLOCK1 = // head turned right
+/// head turned right
+let BLOCK1 =
     [ "................"; ".....gggggg....."; "....gggggggg...."; "....gssssssg...."
       "....gwwsswwg...."; "....gwksskwg...."; "....gssssssg...."; ".....sssss......"
       "..obbbbbbbbbbo.."; ".....bbbbb......"; ".....bbbbb......"; ".....bbbbb......"
@@ -128,13 +134,15 @@ let compose head low = head @ low
 // left), one eye facing the wall, gripping hand reaching up the wall to push up.
 // Lower legs bend toward the wall so the feet press flat against it (the wall is
 // to the right; the renderer flips the sprite for a left-hand wall).
-let CLIMB0 = // grips low
+/// grips low
+let CLIMB0 =
     [ "................"; "................"; ".....gggg......."; "....gggggs......"
       "....gggkss......"; "....ggggss......"; ".....bbb........"; ".....bbb........"
       ".....bbbo......."; ".....bbb........"; ".....bbb........"; "......bb........"
       ".......bbo......"; ".......boo......"; "................"; "................" ]
 
-let CLIMB1 = // grips high (push up); feet shuffle 1px up for a tiny climbing bob
+/// grips high (push up); feet shuffle 1px up for a tiny climbing bob
+let CLIMB1 =
     [ "................"; "................"; ".....gggg......."; "....gggggs......"
       "....gggkss......"; "....ggggss......"; ".....bbbo......."; ".....bbb........"
       ".....bbb........"; ".....bbb........"; "......bb........"; ".......bbo......"
@@ -154,13 +162,15 @@ let FLOAT1 =
 
 // Miner: crouched, swinging a bright steel pickaxe (p) down-and-forward into the
 // slope. The pick sweeps from high (MINE1) to struck-at-ground (MINE0).
-let MINE0 = // pickaxe struck down-right, curved head (-)  at the ground
+/// pickaxe struck down-right, curved head (-)  at the ground
+let MINE0 =
     [ "................"; "................"; "................"; "................"
       "...gggggggg....."; "...gwwsswwg....."; "...gwksskwg....."; "...gssssssgs...."
       "....bbbbb..p...."; "....bbbbbb.p...."; ".....bbb...pp..."; ".....o.o.....p.."
       "...........pp..."; "................"; "................"; "................" ]
 
-let MINE1 = // pickaxe raised up-right, curved head (-)  held high
+/// pickaxe raised up-right, curved head (-)  held high
+let MINE1 =
     [ "............pp.."; "..............p."; "............pp.."; "............p..."
       "...gggggggg.p..."; "...gwwsswwgsp..."; "...gwksskwg....."; "...gssssssg....."
       "....bbbbb......."; "....bbbbbb......"; ".....bbb........"; ".....o.o........"
@@ -177,6 +187,7 @@ let FRAMES =
       CLIMB0; CLIMB1
       FLOAT0; FLOAT1 ]
 
+[<Literal>]
 let SIZE = 16
 let LEGEND = set [ '.'; 'k'; 'g'; 's'; 'b'; 'w'; 'o'; 'r'; 'p' ]
 
@@ -279,9 +290,11 @@ File.WriteAllBytes(outPath, encodePng W H buf)
 printfn "Wrote %s  (%dx%d, %d frames x %d skin tones)" outPath W H (List.length FRAMES) (List.length SKINS)
 
 // ---- favicon: a single walking lemming, scaled up (nearest-neighbour) --------
+[<Literal>]
 let favScale = 8
 let favSize = SIZE * favScale
-let favFrame = List.toArray FRAMES.[0] // walk0
+/// walk0
+let favFrame = List.toArray FRAMES.[0]
 let favBuf = Array.zeroCreate<byte> (favSize * favSize * 4)
 for y in 0 .. favSize - 1 do
     let line = favFrame.[y / favScale]

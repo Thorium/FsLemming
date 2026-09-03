@@ -82,13 +82,13 @@ let private hazardColorAt (t: TerrainSnapshot) wx wy =
     // Bounds guard: the main view can be wider than the level, so callers pass
     // coordinates past the level edge (sky there, never a hazard).
     if wx < 0 || wx >= t.Width || wy < 0 || wy >= t.Height then
-        None
+        ValueNone
     else
         let i = wy * t.Width + wx
         let aboveSame (mask: bool[]) = wy > 0 && mask.[i - t.Width]
-        if t.Lava.[i] then Some(if aboveSame t.Lava then lavaBody else lavaTop)
-        elif t.Water.[i] then Some(if aboveSame t.Water then waterBody else waterTop)
-        else None
+        if t.Lava.[i] then ValueSome(if aboveSame t.Lava then lavaBody else lavaTop)
+        elif t.Water.[i] then ValueSome(if aboveSame t.Water then waterBody else waterTop)
+        else ValueNone
 
 let private paint (data: byte[]) (p: int) (r: byte, g: byte, b: byte) =
     data.[p] <- r
@@ -174,8 +174,8 @@ let draw
                             else bodyB
                 else
                     match hazardColorAt terrain wx vy with
-                    | Some c -> c
-                    | None -> if skyDetail level.Theme h wx vy then skyHi else skyC
+                    | ValueSome c -> c
+                    | ValueNone -> if skyDetail level.Theme h wx vy then skyHi else skyC
 
             paint data ((vy * viewW + vx) * 4) color
 
@@ -319,8 +319,8 @@ let drawMinimap
                     if terrain.Steel.[wy * tw + wx] then steelBody else solidC
                 else
                     match hazardColorAt terrain wx wy with
-                    | Some c -> c
-                    | None -> skyC
+                    | ValueSome c -> c
+                    | ValueNone -> skyC
 
             paint data ((my * mw + mx) * 4) color
 

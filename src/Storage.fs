@@ -7,12 +7,13 @@ module FsLemming.Storage
 open Browser
 open FsLemming.Types
 
+[<Literal>]
 let private key = "fslemming.userLevels"
 
 /// User levels saved in this browser (empty if none / unreadable).
 let loadUserLevels () : Level list =
     let json = window.localStorage.getItem key
-    if isNull json || json = "" then
+    if System.String.IsNullOrEmpty json then
         []
     else
         try

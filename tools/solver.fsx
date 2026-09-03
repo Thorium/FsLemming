@@ -12,6 +12,7 @@
 open System.IO
 open System.Text.Json
 
+[<Literal>]
 let H = 150
 type Lvl = { W: int; solid: bool[]; steel: bool[]; lava: bool[]; water: bool[] }
 
@@ -28,7 +29,8 @@ let rleDecode (runs: int seq) size =
     cells
 
 type S = { X:int; Y:int; Dir:int; Skill:string; Counter:int; FallDist:int; Submerged:int; Alive:bool }
-type Mut = RR of int*int*int*int | AT of int*int*int*int
+[<Struct>]
+type Mut = RR of rx:int*ry:int*rw:int*rh:int | AT of rx:int*ry:int*rw:int*rh:int
 
 /// (startX,startY,startDir) (exitX,exitY,exitW,exitH) plan=(triggerX,skill) list.
 /// A plan item fires when the WALKER reaches triggerX in its travel direction —
@@ -101,7 +103,7 @@ let run (lv:Lvl) (sx,sy,sd) (ex,ey,ew,eh) (plan:(int*string) list) maxT =
         let s2,muts = step s
         for m in muts do apply m
         s <- s2
-        if not s.Alive then res <- sprintf "DIED (%d,%d)" s.X s.Y
+        if not s.Alive then res <- $"DIED (%d{s.X},%d{s.Y})"
         elif inExit s then res <- "SOLVED"
         t<-t+1
     res

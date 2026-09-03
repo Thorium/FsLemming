@@ -15,6 +15,7 @@ let private canvas = document.getElementById "edit" :?> HTMLCanvasElement
 let private ctx = canvas.getContext_2d ()
 let private byId (id: string) = document.getElementById id
 
+[<Literal>]
 let private H = 150
 let mutable private W = 240
 // Four parallel material masks. A cell holds at most one material.

@@ -73,7 +73,7 @@ type World(width: int, height: int, initialSolid: bool[], steel: bool[], lava: b
 
                         match msg with
                         | Snapshot reply -> reply.Reply(snapshot ())
-                        | _ -> ()
+                        | Apply _ | SetBlockers _ -> ()
 
                     return! loop ()
                 }

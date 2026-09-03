@@ -35,6 +35,7 @@ let mutable private lastViews: LemmingView list = []
 let mutable private selected = Floater // the parachute — the first level's lesson
 // Transient click feedback: world (x, y), succeeded?, frames remaining.
 let mutable private clickFx: (int * int * bool * int) option = None
+[<Literal>]
 let private fxLife = 5 // ticks the click ripple lasts (lower = snappier)
 
 // ---- Camera (horizontal scroll for levels wider than the viewport) ----------
@@ -73,7 +74,7 @@ let private refreshCounts () =
         for id, skill, label in skillButtons do
             let n = counts |> Map.tryFind skill |> Option.defaultValue 0
             // Update the label span, not the button — that keeps the icon child.
-            ((byId id).querySelector ".n").textContent <- sprintf "%s (%d)" label n
+            ((byId id).querySelector ".n").textContent <- $"%s{label} (%d{n})"
             // Gray out buttons that are out of stock.
             let cls = (byId id).classList
             if n = 0 then cls.add "empty" else cls.remove "empty"
@@ -85,8 +86,8 @@ let private setText (id: string) (text: string) = (byId id).textContent <- text
 let private updateHud (status: GameStatus) =
     let lvl = game.Level
     setText "hud-level" lvl.Name
-    setText "hud-saved" (sprintf "Saved %d / %d" status.Saved lvl.SaveTarget)
-    setText "hud-out" (sprintf "Out %d / %d" status.Spawned lvl.SpawnCount)
+    setText "hud-saved" ($"Saved %d{status.Saved} / %d{lvl.SaveTarget}")
+    setText "hud-out" ($"Out %d{status.Spawned} / %d{lvl.SpawnCount}")
     setText "hud-time" (sprintf "Time %d" (max 0 (lvl.TimeLimitTicks - status.Elapsed)))
 
     setText
@@ -287,7 +288,7 @@ let private palette = [| "#16c60c"; "#2b3bd6"; "#ffd9a0"; "#aa6633" |]
 let mutable private particles: Particle list = []
 
 // A radial burst of 12 pixels flying outward (deterministic — no RNG needed).
-let private burstAt (ex: int, ey: int) =
+let private burstAt (ex: int) (ey: int) =
     for i in 0..11 do
         let a = float i / 12.0 * System.Math.PI * 2.0
         let speed = 1.1 + 0.35 * float (i % 3)
@@ -311,7 +312,7 @@ let private updateParticles () =
                 Some { p with X = p.X + p.Vx; Y = p.Y + p.Vy; Vy = p.Vy + 0.12; Life = life }) // gravity
 
 // A small low reddish puff when a lemming splats from a fatal fall.
-let private splatAt (ex: int, ey: int) =
+let private splatAt (ex: int) (ey: int) =
     for i in 0..5 do
         let a = float i / 6.0 * System.Math.PI * 2.0
         particles <-
@@ -324,7 +325,7 @@ let private splatAt (ex: int, ey: int) =
             :: particles
 
 // Lava death: orange/yellow flames flying up.
-let private burnAt (ex: int, ey: int) =
+let private burnAt (ex: int) (ey: int) =
     for i in 0..7 do
         let a = float i / 8.0 * System.Math.PI * 2.0
         particles <-
@@ -337,7 +338,7 @@ let private burnAt (ex: int, ey: int) =
             :: particles
 
 // Water death: a few blue bubbles rising.
-let private drownAt (ex: int, ey: int) =
+let private drownAt (ex: int) (ey: int) =
     for i in 0..5 do
         particles <-
             { X = float ex + float (i - 3)
@@ -350,10 +351,10 @@ let private drownAt (ex: int, ey: int) =
 
 let private spawnEffect (x: int, y: int, fx: EffectKind) =
     match fx with
-    | Explode -> burstAt (x, y)
-    | Splat -> splatAt (x, y)
-    | Burn -> burnAt (x, y)
-    | Drown -> drownAt (x, y)
+    | Explode -> burstAt x y
+    | Splat -> splatAt x y
+    | Burn -> burnAt x y
+    | Drown -> drownAt x y
 
 let private drawParticles () =
     for p in particles do
@@ -403,9 +404,9 @@ let rec private tickLoop () =
 let private queryInt (key: string) : int option =
     let s = window.location.search
     let s = if s.StartsWith "?" then s.Substring 1 else s
-    s.Split('&')
+    s.Split '&'
     |> Array.tryPick (fun kv ->
-        match kv.Split('=') with
+        match kv.Split '=' with
         | [| k; v |] when k = key -> (try Some(int v) with _ -> None)
         | _ -> None)
 

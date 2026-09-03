@@ -11,6 +11,7 @@ open FsLemming.Inventory
 /// every decision is delegated to an actor via messages.
 /// Ticks the hatch spends opening before the first lemming drops — gives the
 /// player a moment to read the level.
+[<Literal>]
 let private openDelay = 40
 
 type Game(level: Level) =

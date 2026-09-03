@@ -18,13 +18,16 @@ type private State =
       Alive: bool }
 
 /// A lemming floats/sinks in water this many ticks, then drowns.
+[<Literal>]
 let private drownAfter = 14
 
 /// A fall longer than this many pixels is fatal on landing (unless Floater).
+[<Literal>]
 let private safeFall = 28
 
 /// A walker auto-climbs a rise this many pixels tall (gentle bumps/slopes);
 /// anything taller is a wall — turn around (or, for a Climber, scale it).
+[<Literal>]
 let private maxStepUp = 3
 
 /// True the tick a Bomber's fuse reaches zero (and it's a live, on-map lemming).
@@ -134,10 +137,9 @@ let private step (terrain: TerrainSnapshot) (s: State) : State * Mutation list =
             let s = { s with FallDist = 0 }
 
             match s.Skill with
-            | Blocker ->
-                // Stand firm. (Its position is reported to the World each tick so
-                // other walkers see this cell as impassable.)
-                s, []
+            | Blocker
+            // Stand firm. (Its position is reported to the World each tick so
+            // other walkers see this cell as impassable.)
             | Digger
             | Miner -> s, [] // handled before gravity (dig down / diagonal)
             | Builder ->

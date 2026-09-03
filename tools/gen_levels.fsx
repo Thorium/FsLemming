@@ -10,6 +10,7 @@ open System.IO
 open System.Text.Json
 open System.Text.RegularExpressions
 
+[<Literal>]
 let H = 150
 
 let private bitmap width (rects: (int * int * int * int) list) =
@@ -38,6 +39,7 @@ let private rle (cells: bool[]) =
 
 let private region x y w h = {| x = x; y = y; w = w; h = h |}
 let private inv pairs = pairs |> List.map (fun (s, n) -> {| skill = s; count = n |})
+[<Literal>]
 let private groundY = 126
 let private groundOf width = (0, groundY, width, 24)
 
