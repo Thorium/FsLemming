@@ -203,3 +203,63 @@ textarea {
   select, input, textarea { font-size: 1rem; padding: 0.45rem 0.5rem; min-height: 44px; }
   input[type="number"] { width: 4.5rem; }
 }
+
+/* "Install as app" banner (index.html). Fixed overlay at the top, clear of
+   the notch/status bar; hidden unless the install script decides to show it. */
+#install {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  padding: 0.5em 0.75em;
+  padding-top: calc(0.5em + env(safe-area-inset-top));
+  background: rgba(33, 36, 58, 0.96);
+  color: var(--ink);
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+#install[hidden] {
+  display: none;
+}
+
+#install-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#install button {
+  flex: 0 0 auto;
+  font: inherit;
+  border: 0;
+  border-radius: 0.4em;
+  padding: 0.4em 0.9em;
+  margin: 0;
+  cursor: pointer;
+}
+
+#install-btn {
+  background: var(--green);
+  color: #042310;
+  font-weight: 600;
+}
+
+#install-close {
+  background: transparent;
+  color: inherit;
+  padding: 0.4em 0.5em;
+}
+
+#install .share-icon {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.2em;
+  fill: currentColor;
+}

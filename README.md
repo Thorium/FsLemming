@@ -2,6 +2,8 @@
 
 [>> Play online](https://thorium.github.io/FsLemming/)
 
+**📱 Install as an app:** open the same link on your phone or tablet and tap **Install app** in the banner (Android / Chrome), or **Share → Add to Home Screen** (iPhone / iPad). The game then launches full-screen from your home screen and works offline.
+
 A small F# tutorial on **message-passing architecture**: encapsulated state, no
 shared mutable data, no manual locks. The demo is a slice of *Lemmings* — many
 tiny independent characters plus one shared world — compiled to JavaScript with

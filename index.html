@@ -61,6 +61,13 @@
         <a href="https://github.com/Thorium/FsLemming">https://github.com/Thorium/FsLemming</a>
       </footer>
     </div>
+    <!-- "Install as app" banner: only shown on mobile browsers when the page is
+       not already running as an installed PWA (see the script below). -->
+    <div id="install" hidden role="region" aria-label="Install FsLemming as an app">
+      <span id="install-text"></span>
+      <button id="install-btn" type="button">Install app</button>
+      <button id="install-close" type="button" aria-label="Dismiss">&#x2715;</button>
+    </div>
     <script type="module" src="/src/App.fs.js"></script>
     <script>
       if ('serviceWorker' in navigator) {
@@ -68,6 +75,61 @@
           navigator.serviceWorker.register('./sw.js').catch(() => { /* PWA is best-effort */ });
         });
       }
+    </script>
+    <script>
+      // Offer "install this page as an app" to mobile visitors who are still in
+      // the browser. Chromium browsers (Android Chrome/Edge/Samsung) fire
+      // `beforeinstallprompt`, which we defer behind our own button; Safari on
+      // iOS/iPadOS has no install API, so it gets Share > Add to Home Screen
+      // instructions instead. Dismissing the banner hides it for two weeks.
+      (() => {
+        const banner = document.getElementById('install');
+        const text = document.getElementById('install-text');
+        const installBtn = document.getElementById('install-btn');
+        const closeBtn = document.getElementById('install-close');
+        const DISMISS_KEY = 'fslemming-install-dismissed';
+        const DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
+
+        const ua = navigator.userAgent;
+        // iPadOS Safari reports itself as a Mac, but a Mac with a touch screen.
+        const isIOS = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        const isMobile = isIOS || /Android|Mobile/i.test(ua);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+        let dismissed = false;
+        try { dismissed = Number(localStorage.getItem(DISMISS_KEY)) > Date.now() - DISMISS_MS; } catch { /* storage may be blocked */ }
+        if (!isMobile || isStandalone || dismissed) return;
+
+        // The page flows under the fixed banner, so push it down by the banner's height.
+        const show = () => { banner.hidden = false; document.body.style.marginTop = banner.offsetHeight + 'px'; };
+        const hide = () => { banner.hidden = true; document.body.style.marginTop = ''; };
+        closeBtn.addEventListener('click', () => {
+          hide();
+          try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch { /* best-effort */ }
+        });
+
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          deferredPrompt = e;
+          text.textContent = 'Play FsLemming as an app';
+          installBtn.hidden = false;
+          show();
+        });
+        installBtn.addEventListener('click', async () => {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          const { outcome } = await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          if (outcome === 'accepted') hide();
+        });
+        window.addEventListener('appinstalled', hide);
+
+        if (isIOS) {
+          installBtn.hidden = true;
+          text.innerHTML = 'Install as an app: tap <b>Share</b> <svg class="share-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l4 4h-3v8h-2V7H8l4-4zm-7 9h2v8h10v-8h2v10H5V12z"/></svg> then <b>Add to Home Screen</b>';
+          show();
+        }
+      })();
     </script>
   </body>
 </html>
