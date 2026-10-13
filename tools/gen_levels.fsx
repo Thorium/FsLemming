@@ -270,12 +270,13 @@ campaign
     if has "Blocker" && not (has "Bomber") then
         failwithf "Level '%s' offers Blocker but no Bomber" lvl.name)
 
+let private sRegex = Regex @"\s+"
 // Readable output: indented layout, but with leaf objects (regions, decor and
 // inventory entries) and number arrays (the RLE runs) collapsed back onto
 // single lines — one meaningful thing per line, not one token per line.
 let json =
     let raw = JsonSerializer.Serialize(campaign, JsonSerializerOptions(WriteIndented = true))
-    let collapse (m: Match) = Regex.Replace(m.Value, @"\s+", " ")
+    let collapse (m: Match) = sRegex.Replace(m.Value, " ")
     let leafObjs = Regex.Replace(raw, @"\{[^{}\[\]]*\}", collapse)
     Regex.Replace(leafObjs, @"\[[\s\d,-]*\]", collapse)
 
