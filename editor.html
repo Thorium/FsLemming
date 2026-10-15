@@ -18,7 +18,11 @@
         stamps a scenery prop on the surface (click a prop to remove it);
         <em>Pillar</em> drags out a region that the game paints as a fluted
         column (click one to remove it). Set the parameters and export the same
-        <code>levels.json</code> the game loads.
+        <code>levels.json</code> the game loads. <em>Check level</em> runs a
+        lemming through it with the game's own rules: it draws the walk with no
+        skills (grey), a solution if it finds one (yellow, with a dot where each
+        skill is given), and lists what's wrong — a deadly drop from the hatch,
+        a buried exit, no solution with up to 3 skills, too little time.
       </p>
       <div class="controls">
         Brush:
@@ -62,6 +66,13 @@
         <label><i class="ic ic-floater"></i>Floater <input type="number" id="inv-floater" value="0" /></label>
         <label><i class="ic ic-bomber"></i>Bomber <input type="number" id="inv-bomber" value="0" /></label>
       </div>
+      <div class="controls">
+        <button id="check" title="checks the hatch, the exit and the numbers, and searches for a solution">✔ Check level</button>
+        <button id="fix-exit" title="moves the exit down (or up) to stand on the ground">Exit onto ground</button>
+        <button id="fix-hatch" title="lowers (or raises) the hatch so the drop below it is safe">Hatch to safe height</button>
+        <span id="check-status"></span>
+      </div>
+      <ul id="check-findings" class="findings"></ul>
       <div class="controls">
         <button id="save">Save to browser</button>
         <button id="export">Download levels.json</button>

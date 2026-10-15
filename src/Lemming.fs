@@ -4,8 +4,10 @@ open FsLemming.Types
 
 /// Each lemming is its own actor with fully private state. The outside world
 /// can only: tell it the current terrain (and get back its intended move), or
-/// change its skill. Nothing else can read or write `State`.
-type private State =
+/// change its skill. Nothing else can read or write an actor's `State` — the
+/// type is public only so the level check (src/LevelCheck.fs) and the tools can
+/// run the pure `step` on states of their own.
+type State =
     { Id: int
       X: int
       Y: int
@@ -23,7 +25,7 @@ let private drownAfter = 14
 
 /// A fall longer than this many pixels is fatal on landing (unless Floater).
 [<Literal>]
-let private safeFall = 28
+let safeFall = 28
 
 /// A walker auto-climbs a rise this many pixels tall (gentle bumps/slopes);
 /// anything taller is a wall — turn around (or, for a Climber, scale it).
@@ -43,6 +45,26 @@ let private initialCounter =
     | Builder -> 12 // bricks
     | _ -> 0
 
+/// A fresh lemming at the hatch: walking right, unarmed.
+let spawnState (id: int) (x: int) (y: int) : State =
+    { Id = id
+      X = x
+      Y = y
+      Dir = 1
+      Skill = Walker
+      Counter = 0
+      FallDist = 0
+      Fuse = 0
+      Submerged = 0
+      Alive = true }
+
+/// The state after assigning a skill: a Bomber lights the fuse and keeps its
+/// current skill; any other skill replaces it.
+let withSkill (skill: Skill) (s: State) : State =
+    match skill with
+    | Bomber -> { s with Fuse = 40 }
+    | skill -> { s with Skill = skill; Counter = initialCounter skill }
+
 type private Msg =
     | Tick of TerrainSnapshot * AsyncReplyChannel<TickResult>
     | SetSkill of Skill
@@ -53,7 +75,7 @@ type private Msg =
 /// Pure decision function: given the terrain and current state, what does this
 /// lemming do this tick? Returns the next state and any terrain edits it wants.
 /// Being pure makes it trivial to unit-test the behaviour without any actors.
-let private step (terrain: TerrainSnapshot) (s: State) : State * Mutation list =
+let step (terrain: TerrainSnapshot) (s: State) : State * Mutation list =
     if not s.Alive then
         s, []
     // Fell off the bottom of the map -> gone.
@@ -196,6 +218,19 @@ let private step (terrain: TerrainSnapshot) (s: State) : State * Mutation list =
                     | Some u -> { s with X = nx; Y = s.Y - u }, [] // step up the bump
                     | None -> { s with Dir = -s.Dir }, [] // too tall — turn (Climbers scale it, handled above)
 
+/// How a lemming died going from `before` to `after` this tick (for the right
+/// particle effect); None if it lives on or simply fell off the map.
+let deathEffect (terrain: TerrainSnapshot) (before: State) (after: State) : EffectKind option =
+    if fuseExpired terrain before then
+        Some Explode
+    elif before.Alive && not after.Alive then
+        match terrain.HazardAt(before.X, before.Y) with
+        | Some Lava -> Some Burn
+        | Some Water -> Some Drown
+        | None -> if after.Y < terrain.Height then Some Splat else None
+    else
+        None
+
 /// The public, immutable snapshot of a lemming (for rendering / coordination).
 let private toView (s: State) : LemmingView =
     { Id = s.Id
@@ -225,8 +260,7 @@ type Lemming(id: int, x: int, y: int) =
                         let next =
                             try
                                 match msg with
-                                | SetSkill Bomber -> { s with Fuse = 40 } // light the fuse, keep current skill
-                                | SetSkill skill -> { s with Skill = skill; Counter = initialCounter skill }
+                                | SetSkill skill -> withSkill skill s // a Bomber only lights the fuse
                                 | Detonate fuse -> { s with Fuse = fuse }
                                 | QuerySkill reply ->
                                     reply.Reply(s.Skill, s.Fuse) // read-only; state unchanged
@@ -235,16 +269,7 @@ type Lemming(id: int, x: int, y: int) =
                                     let s', mutations = step terrain s
 
                                     // Classify a death this tick, for the right particle effect.
-                                    let effect =
-                                        if fuseExpired terrain s then
-                                            Some Explode
-                                        elif s.Alive && not s'.Alive then
-                                            match terrain.HazardAt(s.X, s.Y) with
-                                            | Some Lava -> Some Burn
-                                            | Some Water -> Some Drown
-                                            | None -> if s'.Y < terrain.Height then Some Splat else None
-                                        else
-                                            None
+                                    let effect = deathEffect terrain s s'
 
                                     reply.Reply { View = toView s'; Mutations = mutations; Effect = effect }
                                     s'
@@ -263,17 +288,7 @@ type Lemming(id: int, x: int, y: int) =
                         return! loop next
                 }
 
-            loop
-                { Id = id
-                  X = x
-                  Y = y
-                  Dir = 1
-                  Skill = Walker
-                  Counter = 0
-                  FallDist = 0
-                  Fuse = 0
-                  Submerged = 0
-                  Alive = true })
+            loop (spawnState id x y))
 
     member _.Id = id
     member _.Tick(terrain) = agent.PostAndAsyncReply(fun rc -> Tick(terrain, rc))

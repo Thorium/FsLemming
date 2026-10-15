@@ -2,6 +2,29 @@ module FsLemming.World
 
 open FsLemming.Types
 
+/// Apply one terrain edit to a solid mask in place. Clearing terrain never
+/// removes indestructible steel. The World actor uses it on its private grid;
+/// the level check (src/LevelCheck.fs) on a copy of its own.
+let applyMutation (width: int) (height: int) (steel: bool[]) (solid: bool[]) (m: Mutation) =
+    let setRect rx ry rw rh value =
+        for y in ry .. ry + rh - 1 do
+            for x in rx .. rx + rw - 1 do
+                if x >= 0 && x < width && y >= 0 && y < height then
+                    let i = y * width + x
+                    if value || not steel.[i] then solid.[i] <- value
+
+    match m with
+    | RemoveCircle(cx, cy, r) ->
+        for y in cy - r .. cy + r do
+            for x in cx - r .. cx + r do
+                if x >= 0 && x < width && y >= 0 && y < height then
+                    let dx, dy = x - cx, y - cy
+                    let i = y * width + x
+                    if dx * dx + dy * dy <= r * r && not steel.[i] then
+                        solid.[i] <- false
+    | RemoveRect(rx, ry, rw, rh) -> setRect rx ry rw rh false
+    | AddTerrain(rx, ry, rw, rh) -> setRect rx ry rw rh true
+
 /// The World actor owns the one piece of genuinely shared state — the terrain.
 ///
 /// In a naive design every lemming would read and write a shared mutable grid,
@@ -22,23 +45,6 @@ type World(width: int, height: int, initialSolid: bool[], steel: bool[], lava: b
             // The current set of Blocker positions. Replaced wholesale each tick
             // by the coordinator, so dead/removed blockers drop out for free.
             let mutable blockers : Set<int * int> = Set.empty
-
-            // Clearing terrain (value = false) never removes indestructible steel.
-            let setRect rx ry rw rh value =
-                for y in ry .. ry + rh - 1 do
-                    for x in rx .. rx + rw - 1 do
-                        if x >= 0 && x < width && y >= 0 && y < height then
-                            let i = y * width + x
-                            if value || not steel.[i] then solid.[i] <- value
-
-            let removeCircle cx cy r =
-                for y in cy - r .. cy + r do
-                    for x in cx - r .. cx + r do
-                        if x >= 0 && x < width && y >= 0 && y < height then
-                            let dx, dy = x - cx, y - cy
-                            let i = y * width + x
-                            if dx * dx + dy * dy <= r * r && not steel.[i] then
-                                solid.[i] <- false
 
             let snapshot () =
                 { Width = width
@@ -63,10 +69,7 @@ type World(width: int, height: int, initialSolid: bool[], steel: bool[], lava: b
                             reply.Reply(snapshot ())
                         | Apply mutations ->
                             for m in mutations do
-                                match m with
-                                | RemoveCircle(cx, cy, r) -> removeCircle cx cy r
-                                | RemoveRect(rx, ry, rw, rh) -> setRect rx ry rw rh false
-                                | AddTerrain(rx, ry, rw, rh) -> setRect rx ry rw rh true
+                                applyMutation width height steel solid m
                         | SetBlockers bs -> blockers <- bs
                     with ex ->
                         eprintfn "World failed on a message: %O" ex

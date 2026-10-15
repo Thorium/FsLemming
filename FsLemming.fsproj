@@ -12,7 +12,11 @@
     <Compile Include="src/Lemming.fs" />
     <Compile Include="src/Inventory.fs" />
     <Compile Include="src/Game.fs" />
+    <!-- The level check: used by the editor and the tools, not the game -->
+    <Compile Include="src/LevelCheck.fs" />
     <Compile Include="src/LevelJson.fs" />
+    <!-- The editor's Web Worker for the level check's search -->
+    <Compile Include="src/CheckWorker.fs" />
     <Compile Include="src/Storage.fs" />
     <Compile Include="src/Levels.fs" />
     <Compile Include="src/Sprites.fs" />

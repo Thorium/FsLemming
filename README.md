@@ -85,12 +85,58 @@ backdrop (roots, pillars, chains, stalactites) from a coordinate hash.
 After regenerating, verify every puzzle still solves:
 
 ```bash
-dotnet fsi tools/solver.fsx       # replays each level from src/levels.json
+dotnet fsi tools/solver.fsx       # replays each level's scripted route from src/levels.json
 ```
+
+The solver replays the route each level was designed around with the game's own
+rules (`Lemming.step` and `World.applyMutation`, loaded from `src/`), so it can't
+drift from the game.
+
+### Checking levels
+
+`src/LevelCheck.fs` checks whether a level is fair and solvable. It runs one
+lemming with the game's own rules — the pure `Lemming.step` and
+`World.applyMutation`, called directly rather than through the actors — and
+searches for the plan with the fewest skills (up to 3, from the level's own
+inventory) that saves it. It reports:
+
+- a hatch inside terrain, over a bottomless drop, or over a fall the lemmings
+  can't survive (more than 28 px) without enough Floaters;
+- an exit outside the map, buried in terrain, or all lava/water;
+- where lemmings with no skills end up — splat, burnt, drowned, off the map, or
+  walking back and forth for ever — and a warning when they reach the exit
+  without any skills (not a puzzle);
+- the solution it finds ("Basher at (90, 89), then Floater at (120, 89)"), or
+  that it found no plan of up to 3 skills (a problem: the level is probably
+  impossible — the search gives skills only to walking or just-falling
+  lemmings and merges routes that reach the same spot, so it's not a proof);
+- a save target above the lemmings released, too little time for the last
+  needed lemming, and too few Floaters/Climbers when every saved lemming needs one.
+
+It is a one-lemming check: Blockers and Bombers (which only help a crowd) aren't
+searched. Only the editor and the tools load it — the game never does.
+
+The same check runs from the command line, for scripts and agents:
+
+```bash
+dotnet fsi tools/levels.fsx --check [levels.json] [--level N] [--json]   # findings (+ spots in JSON)
+dotnet fsi tools/levels.fsx --solve [levels.json] [--level N]            # the plan it finds
+dotnet fsi tools/levels.fsx --render [levels.json] out/ --route          # PNG: walk, solution, problems
+dotnet fsi tools/levels.fsx --compare before.json after.json out/        # before | after | changes
+```
+
+The file defaults to `src/levels.json` (the editor's downloaded `levels.json`
+works too); `--level` takes a number or part of a name. `--check` exits with
+code 1 when it finds a problem. `tools/LevelFile.fsx` is the one `levels.json`
+reader both tools share.
 
 There's also an **in-browser level editor** at `editor.html` (linked from the
 game): import an image (dark pixels → solid terrain), place the hatch/exit, set
-the parameters, then either:
+the parameters, press **Check level** — it draws the no-skill walk (grey) and
+the solution (yellow, a dot where each skill is given) on the map and lists what
+it found (the search runs in a Web Worker, so the page stays responsive; an
+edit stops it); **Exit onto ground** and **Hatch to safe height** fix the two simplest
+problems — then either:
 
 - **Save to browser** — stores the level in `localStorage`; the game appends any
   saved levels to its campaign automatically on load.
@@ -125,6 +171,11 @@ untouched.
 | | `src/Render.fs` | blits the visible camera window + the minimap |
 | | `src/App.fs` | the game page — DOM wiring, camera, game loop |
 | | `src/Editor.fs` | the level-editor page (`editor.html`) |
+| **Editor & tools** | `src/LevelCheck.fs` | the level check + solution search (runs `Lemming.step` / `World.applyMutation` directly; not loaded by the game) |
+| | `src/CheckWorker.fs` | the editor's Web Worker: runs the check's search off the page thread |
+| | `tools/levels.fsx` | level commands: check, solve, render, compare |
+| | `tools/solver.fsx` | campaign regression: each level's scripted route |
+| | `tools/LevelFile.fsx` | the `levels.json` reader the tools share |
 
 The domain layer never references the presentation layer. `Render`/`Sprites`
 only ever receive immutable `TerrainSnapshot` / `LemmingView` values, so you can

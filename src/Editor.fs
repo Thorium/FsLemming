@@ -36,6 +36,26 @@ let mutable private decorV = 0 // next prop variant; cycles so stamps vary
 let mutable private pillarStart: (int * int) option = None
 let mutable private pillarPreview: Region option = None
 
+// The last Check result, drawn over the map until the next edit.
+let mutable private lastReport: LevelCheck.Report option = None
+
+// The check's search runs in a Web Worker (CheckWorker.fs). Each check gets a
+// number; an edit or a new check stops the running worker, and a reply for an
+// older number is dropped.
+let mutable private checkRun = 0
+let mutable private checkWorker: obj option = None
+
+[<Emit("new Worker(new URL('./CheckWorker.fs.js', import.meta.url), { type: 'module' })")>]
+let private newCheckWorker () : obj = jsNative
+
+let private stopCheck () =
+    checkRun <- checkRun + 1
+    match checkWorker with
+    | Some w ->
+        w?terminate ()
+        checkWorker <- None
+    | None -> ()
+
 let private groundTerrain w =
     let a = Array.zeroCreate (w * H)
     for y in 126 .. H - 1 do
@@ -118,8 +138,58 @@ let private redraw () =
         ctx?strokeStyle <- "#ffffff"
         ctx.strokeRect (x - 2.0, y - 8.0, 5.0, 8.0)
 
+    // The Check: the no-skill walk (grey), the solution (yellow) with a labelled
+    // dot where each skill is given, a red dot where the walk ends badly, and a
+    // magenta cross on each problem spot.
+    match lastReport with
+    | None -> ()
+    | Some r ->
+        let px (x: int) = (float x + 0.5) * scaleX
+        let py (y: int) = (float y + 0.5) * scaleY
+        let trace (points: (int * int) list) (colour: string) =
+            ctx?fillStyle <- colour
+            for x, y in points do
+                ctx.fillRect (px x - 1.0, py y - 1.0, 2.0, 2.0)
+        let spot (x: int) (y: int) (colour: string) =
+            ctx?fillStyle <- colour
+            ctx.beginPath ()
+            ctx.arc (px x, py y, 4.0, 0.0, 2.0 * System.Math.PI)
+            ctx.fill ()
+        trace r.NoSkills.Trace "rgba(190, 190, 190, 0.8)"
+        match r.Solution with
+        | Some s ->
+            trace s.Trace "rgba(255, 230, 60, 0.95)"
+            ctx.font <- "9px monospace"
+            ctx?textAlign <- "center"
+            ctx?textBaseline <- "bottom"
+            for a in s.Assignments do
+                spot a.X a.Y "#50dcff"
+                ctx?fillStyle <- "#ffffff"
+                ctx.fillText ($"%A{a.Skill}", px a.X, py a.Y - 5.0)
+        | None -> ()
+        if r.NoSkills.End <> LevelCheck.Saved then spot r.NoSkills.EndX r.NoSkills.EndY "#ff3030"
+        ctx?strokeStyle <- "#ff40ff"
+        ctx.lineWidth <- 2.0
+        for f in r.Findings do
+            if f.X >= 0 && f.Severity <> LevelCheck.Note then
+                ctx.beginPath ()
+                ctx.moveTo (px f.X - 6.0, py f.Y - 6.0)
+                ctx.lineTo (px f.X + 6.0, py f.Y + 6.0)
+                ctx.moveTo (px f.X + 6.0, py f.Y - 6.0)
+                ctx.lineTo (px f.X - 6.0, py f.Y + 6.0)
+                ctx.stroke ()
+
 // ---- Editing: draw/erase terrain, place hatch/exit (click or drag) ----------
 let mutable private painting = false
+
+/// The map changed: the last Check no longer applies.
+let private staleCheck () =
+    let running = checkWorker.IsSome
+    stopCheck ()
+    if lastReport.IsSome || running then
+        lastReport <- None
+        (byId "check-findings").innerHTML <- ""
+        (byId "check-status").textContent <- "Edited since the check: check again."
 
 // Paint one material into the 7x7 brush footprint; a cell holds at most one
 // material, so each is set exclusively (erase clears all).
@@ -152,10 +222,13 @@ let private editAt (clientX: float) (clientY: float) =
 
     match placeMode with
     | "dirt" | "steel" | "lava" | "water" | "erase" -> brush wx wy placeMode
-    | "hatch" -> hatch <- { hatch with X = wx - hatch.W / 2; Y = wy - hatch.H / 2 }
-    | "exit" -> exit <- { exit with X = wx - exit.W / 2; Y = wy - exit.H / 2 }
+    // Whole records, not { hatch with ... }: Fable copies a mutable struct through a
+    // reference cell there and loses W and H.
+    | "hatch" -> hatch <- { X = wx - hatch.W / 2; Y = wy - hatch.H / 2; W = hatch.W; H = hatch.H }
+    | "exit" -> exit <- { X = wx - exit.W / 2; Y = wy - exit.H / 2; W = exit.W; H = exit.H }
     | _ -> ()
 
+    staleCheck ()
     redraw ()
 
 canvas.addEventListener ("mousedown", fun e ->
@@ -258,6 +331,7 @@ let private thresholdImage (img: HTMLImageElement) =
     water <- Array.zeroCreate (w * H)
     decor <- [] // stale coordinates would float over the new terrain
     pillars <- []
+    staleCheck ()
     redraw ()
 
 (byId "img").addEventListener (
@@ -341,6 +415,99 @@ let private download (name: string) (content: string) =
         (byId "save-status").textContent <-
             sprintf "Saved — you now have %d browser level(s). Open the game to play them." (Storage.count ())
 )
+
+// ---- Check & quick fixes ----------------------------------------------------
+// LevelCheck runs one lemming with the game's own rules (Lemming.step,
+// World.applyMutation) and searches for a solution; the findings list below
+// the buttons and the overlay on the map show what it found.
+
+let private escapeHtml (s: string) = s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;")
+
+let private showReport (r: LevelCheck.Report) =
+    let sevName =
+        function
+        | LevelCheck.Problem -> "problem"
+        | LevelCheck.Warning -> "warning"
+        | LevelCheck.Note -> "note"
+    (byId "check-findings").innerHTML <-
+        r.Findings
+        |> List.map (fun f ->
+            let spot = if f.X >= 0 then $" <small>(%d{f.X}, %d{f.Y})</small>" else ""
+            sprintf "<li class=\"%s\"><span class=\"sev\">%s</span>%s%s</li>" (sevName f.Severity) (sevName f.Severity) (escapeHtml f.Message) spot)
+        |> String.concat ""
+    let count sev = r.Findings |> List.filter (fun f -> f.Severity = sev) |> List.length
+    (byId "check-status").textContent <-
+        match count LevelCheck.Problem, count LevelCheck.Warning with
+        | 0, 0 -> "Looks good."
+        | p, wn -> $"%d{p} problem(s), %d{wn} warning(s)."
+
+/// Run the check: the search in a Web Worker (it can take seconds), the rest
+/// here once it replies.
+let private runCheck () =
+    stopCheck ()
+    let run = checkRun
+    let level = buildLevel ()
+    lastReport <- None
+    (byId "check-findings").innerHTML <- ""
+    (byId "check-status").textContent <- "Checking…"
+    redraw ()
+    let worker = newCheckWorker ()
+    checkWorker <- Some worker
+    let finish () =
+        worker?terminate ()
+        checkWorker <- None
+    worker?onmessage <- fun (e: obj) ->
+        if run = checkRun then
+            finish ()
+            let reply = e?data
+            if isNull reply then
+                (byId "check-status").textContent <- "The check could not read this level."
+            else
+                let plan = if reply?found then Some(LevelCheck.planOfInts reply?plan) else None
+                let r = LevelCheck.checkWith (fun _ -> plan, reply?complete) level
+                lastReport <- Some r
+                showReport r
+                redraw ()
+    worker?onerror <- fun (_: obj) ->
+        if run = checkRun then
+            finish ()
+            (byId "check-status").textContent <- "The check failed: see the browser console."
+    worker?postMessage (LevelJson.encodeCampaign [ level ])
+
+// Changing the numbers or the inventory also makes the last check stale.
+for id in [ "f-spawn"; "f-every"; "f-save"; "f-time"; "inv-digger"; "inv-basher"; "inv-miner"; "inv-builder"; "inv-blocker"; "inv-climber"; "inv-floater"; "inv-bomber" ] do
+    (byId id).addEventListener ("input", fun _ -> staleCheck ())
+
+let private solidAt x y = x >= 0 && x < W && y >= 0 && y < H && terrain.[y * W + x]
+
+/// The ground surface in column x from row y: the first solid cell below with
+/// open air above it — or, when (x, y) is inside terrain, the surface above.
+let private surfaceFrom (x: int) (y: int) =
+    if solidAt x y then
+        let rec up yy = if yy <= 0 then None elif not (solidAt x (yy - 1)) then Some yy else up (yy - 1)
+        up y
+    else
+        [ max 0 (y + 1) .. H - 1 ] |> List.tryFind (fun yy -> solidAt x yy)
+
+(byId "check").addEventListener ("click", fun _ -> runCheck ())
+
+// Stand the exit on the ground under (or above) its middle.
+(byId "fix-exit").addEventListener ("click", fun _ ->
+    match surfaceFrom (exit.X + exit.W / 2) (exit.Y + exit.H - 1) with
+    | Some ground ->
+        exit <- { X = exit.X; Y = ground - exit.H; W = exit.W; H = exit.H }
+        redraw ()
+        runCheck ()
+    | None -> (byId "check-status").textContent <- "There is no ground under the exit to stand it on.")
+
+// Put the hatch at half the safe fall above the ground below it.
+(byId "fix-hatch").addEventListener ("click", fun _ ->
+    match surfaceFrom (hatch.X + hatch.W / 2) hatch.Y with
+    | Some ground ->
+        hatch <- { X = hatch.X; Y = max 0 (ground - 1 - Lemming.safeFall / 2); W = hatch.W; H = hatch.H }
+        redraw ()
+        runCheck ()
+    | None -> (byId "check-status").textContent <- "There is no ground under the hatch: draw some first.")
 
 // ---- Init -------------------------------------------------------------------
 terrain <- groundTerrain W

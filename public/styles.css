@@ -263,3 +263,16 @@ textarea {
   vertical-align: -0.2em;
   fill: currentColor;
 }
+
+/* Level editor: the Check findings list. */
+.findings {
+  list-style: none;
+  margin: 0.4rem 0;
+  padding: 0;
+  font-size: 0.9rem;
+}
+.findings li { padding: 0.15rem 0.4rem; border-left: 4px solid transparent; }
+.findings li.problem { border-left-color: #e5484d; }
+.findings li.warning { border-left-color: #f5a524; }
+.findings li.note { border-left-color: #6b7280; opacity: 0.85; }
+.findings .sev { font-weight: 600; margin-right: 0.4em; text-transform: uppercase; font-size: 0.75rem; }

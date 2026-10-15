@@ -12,7 +12,17 @@ open FsLemming.Inventory
 /// Ticks the hatch spends opening before the first lemming drops — gives the
 /// player a moment to read the level.
 [<Literal>]
-let private openDelay = 40
+let openDelay = 40
+
+/// Where the hatch drops each lemming: its centre column, top row.
+let spawnPoint (level: Level) = level.Hatch.X + level.Hatch.W / 2, level.Hatch.Y
+
+/// Is a lemming at (x, y) inside the level's exit?
+let inExitOf (level: Level) (x: int) (y: int) =
+    x >= level.Exit.X
+    && x < level.Exit.X + level.Exit.W
+    && y >= level.Exit.Y
+    && y < level.Exit.Y + level.Exit.H
 
 type Game(level: Level) =
 
@@ -28,11 +38,7 @@ type Game(level: Level) =
     let mutable dead = 0
     let mutable elapsed = 0
 
-    let inExit (v: LemmingView) =
-        v.X >= level.Exit.X
-        && v.X < level.Exit.X + level.Exit.W
-        && v.Y >= level.Exit.Y
-        && v.Y < level.Exit.Y + level.Exit.H
+    let inExit (v: LemmingView) = inExitOf level v.X v.Y
 
     let outcome () =
         if saved >= level.SaveTarget then Won
@@ -107,7 +113,8 @@ type Game(level: Level) =
                // `x % 0` = NaN under Fable — no lemming would ever spawn.
                && (elapsed - openDelay) % max 1 level.SpawnEveryTicks = 0 then
                 // Prepend (O(1)); order among lemmings doesn't matter, they're independent.
-                active <- Lemming(nextId, level.Hatch.X + level.Hatch.W / 2, level.Hatch.Y) :: active
+                let sx, sy = spawnPoint level
+                active <- Lemming(nextId, sx, sy) :: active
                 nextId <- nextId + 1
                 spawned <- spawned + 1
 
